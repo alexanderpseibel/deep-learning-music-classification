@@ -1,0 +1,25 @@
+# Core scientific libraries
+numpy
+scipy
+pandas
+
+# Audio processing
+librosa
+soundfile
+
+# Deep learning
+torch==2.2.2
+torchaudio==2.2.2
+
+# Models & Transformers
+timm==0.9.16
+transformers==4.40.0
+
+# Evaluation and training
+scikit-learn
+tqdm
+matplotlib
+wandb
+
+# Optional but useful for audio experiments
+pydub
