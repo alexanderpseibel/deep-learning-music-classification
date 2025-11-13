@@ -1,0 +1,19 @@
+# Basic training settings
+epochs: 10
+batch_size: 32
+lr: 0.001
+optimizer: "adam"
+
+# Model settings
+model_name: "cnn_baseline"
+num_classes: 50   # change depending on dataset
+
+# Data settings
+sample_rate: 32000
+n_mels: 128
+hop_length: 512
+n_fft: 1024
+
+# Paths (change these)
+train_data_path: "data/train/"
+val_data_path: "data/val/"
