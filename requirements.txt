@@ -3,9 +3,6 @@ numpy
 scipy
 pandas
 
-# Analysis & Visualisations
-wandb
-
 # Audio processing
 librosa
 soundfile
