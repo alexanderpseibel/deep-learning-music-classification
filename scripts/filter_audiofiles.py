@@ -1,43 +1,49 @@
+#!/usr/bin/env python3
 import os
 import shutil
 import pandas as pd
+from multiprocessing import Pool, cpu_count
 
-# Paths
 CLEAN_META = "/work/NLP-mini-project/datasets/fma_clean/clean_metadata.csv"
-
 SRC_AUDIO = "/work/NLP-mini-project/datasets/fma/fma_mp3s/fma_large"
 DST_AUDIO = "/work/NLP-mini-project/datasets/fma/fma_selected"
 
 # Load metadata
 df = pd.read_csv(CLEAN_META)
 
-# Create destination directory
+# Ensure destination base exists
 os.makedirs(DST_AUDIO, exist_ok=True)
 
-missing_files = 0
-copied_files = 0
-
-for _, row in df.iterrows():
-    track_id = row["track_id"]
-
-    # Build source path correctly
+def copy_file(track_id):
     folder = f"{track_id // 1000:03d}"
     filename = f"{track_id:06d}.mp3"
-    src_path = os.path.join(SRC_AUDIO, folder, filename)
 
-    # Build destination directory
+    src = os.path.join(SRC_AUDIO, folder, filename)
     dst_dir = os.path.join(DST_AUDIO, folder)
+    dst = os.path.join(dst_dir, filename)
+
     os.makedirs(dst_dir, exist_ok=True)
 
-    dst_path = os.path.join(dst_dir, filename)
-
-    # Copy file
-    if os.path.exists(src_path):
-        shutil.copy2(src_path, dst_path)
-        copied_files += 1
+    if os.path.exists(src):
+        shutil.copy2(src, dst)
+        return 1
     else:
-        missing_files += 1
+        return 0
 
-print(f"Copied {copied_files} audio files.")
-print(f"Missing {missing_files} audio files (likely corrupted or missing).")
-print("Filtered dataset saved to:", DST_AUDIO)
+if __name__ == "__main__":
+    track_ids = df["track_id"].tolist()
+
+    workers = min(32, cpu_count())  # use max 32 workers
+    print(f"Using {workers} parallel workers...")
+
+    copied = 0
+
+    with Pool(workers) as pool:
+        for i, result in enumerate(pool.imap_unordered(copy_file, track_ids), start=1):
+            copied += result
+            if i % 1000 == 0:
+                print(f"Copied {copied}/{i} files so far...")
+
+    print(f"\nFinished!")
+    print(f"Total copied: {copied}")
+    print(f"Missing files: {len(track_ids) - copied}")
