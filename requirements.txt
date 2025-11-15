@@ -2,6 +2,7 @@
 numpy
 scipy
 pandas
+seaborn
 
 # Audio processing
 librosa
