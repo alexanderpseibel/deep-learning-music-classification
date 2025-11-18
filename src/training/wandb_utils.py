@@ -117,22 +117,19 @@ def log_error_heatmap(y_true, y_pred, class_names, step):
 #              PRECISION–RECALL CURVES
 # ----------------------------------------------------------
 def log_precision_recall(y_true, y_probs, class_names, step):
-    """Log PR curves per class using line_series API."""
+    """Log PR curves per class using line_series (W&B 0.23.0)."""
     num_classes = y_true.shape[1]
 
     for i in range(num_classes):
         precision, recall, _ = precision_recall_curve(y_true[:, i], y_probs[:, i])
 
-        table = wandb.Table(data=list(zip(recall, precision)),
-                            columns=["recall", "precision"])
-
         wandb.log({
             f"pr_curves/{class_names[i]}": wandb.plot.line_series(
-                xs="recall",
-                ys=["precision"],
-                keys=[class_names[i]],
+                xs=recall.tolist(),
+                ys=[precision.tolist()],        # must be a list of series
+                keys=[class_names[i]],          # one label
                 title=f"PR Curve: {class_names[i]}",
-                data_table=table
             )
         }, step=step)
+
 
