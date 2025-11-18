@@ -1,5 +1,5 @@
 # Core scientific libraries
-numpy
+numpy<2
 scipy
 pandas
 seaborn
