@@ -1,4 +1,5 @@
-metadata_csv: "NLP-mini-project/datasets/fma/fma_clean/clean_metadata.csv"
-mel_root: "NLP-mini-project/datasets/fma/fma_clean/mels/"
+metadata_csv: "/work/NLP-mini-project/datasets/fma/fma_clean/clean_metadata.csv"
+mel_root: "/work/NLP-mini-project/datasets/fma/fma_clean/mels/"
 batch_size: 16
 num_workers: 8
+
