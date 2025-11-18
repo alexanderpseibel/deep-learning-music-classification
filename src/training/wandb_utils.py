@@ -19,33 +19,25 @@ def init_wandb(config: dict, project_name: str = "nlp-mini-project"):
 
 
 # ----------------------------------------------------------
-#         MEL → COLROED IMAGE 
+#         MEL → COLORED IMAGE (REAL SPECTROGRAM)
 # ----------------------------------------------------------
-def mel_to_image(mel, cmap="viridis"):
+def mel_to_image(mel, cmap="magma"):
     """
-    Convert raw mel spectrogram to a colored RGB image:
-    - log scale
-    - normalize to [0,1]
-    - apply matplotlib colormap
-    - return uint8 RGB image
+    Convert a raw mel-spectrogram (128×T float32 array)
+    into a colored RGB uint8 image suitable for W&B.
     """
     mel = np.array(mel)
 
-    # Log transform
-    mel_log = np.log1p(np.maximum(mel, 1e-9))
-
-    # Normalize 0–1
-    mel_norm = (mel_log - mel_log.min()) / (mel_log.max() - mel_log.min() + 1e-8)
+    # Already in dB → normalize to 0–1
+    mel_norm = (mel - mel.min()) / (mel.max() - mel.min() + 1e-8)
 
     # Apply colormap
     colormap = plt.get_cmap(cmap)
-    mel_rgb = colormap(mel_norm)[:, :, :3]  # drop alpha channel
+    mel_rgb = colormap(mel_norm)[:, :, :3]
 
-    # Convert to uint8 [0,255]
+    # Convert to uint8 0–255
     mel_uint8 = (mel_rgb * 255).astype(np.uint8)
-
     return mel_uint8
-
 
 
 # ----------------------------------------------------------
@@ -63,7 +55,6 @@ def log_example_audio(audio_array, sample_rate, name="audio_example", step=None)
 
 
 def log_example_image(mel, name="image_example", step=None):
-    """Automatically convert mel → image."""
     img = mel_to_image(mel)
     wandb.log({name: wandb.Image(img)}, step=step)
 
@@ -87,14 +78,12 @@ def log_misclassified_examples(misclassified_examples, step, max_items=3):
 # ----------------------------------------------------------
 def compute_confusion_cooccurrence(y_true, y_pred):
     num_classes = y_true.shape[1]
-    matrix = np.zeros((num_classes, num_classes), dtype=float)
+    matrix = np.zeros((num_classes, num_classes))
 
     for i in range(num_classes):
         idx = np.where(y_true[:, i] == 1)[0]
-        if len(idx) == 0:
-            continue
-        matrix[i] = np.mean(y_pred[idx], axis=0)
-
+        if len(idx) > 0:
+            matrix[i] = np.mean(y_pred[idx], axis=0)
     return matrix
 
 
@@ -102,7 +91,7 @@ def log_confusion_heatmap(y_true, y_pred, class_names, step):
     matrix = compute_confusion_cooccurrence(y_true, y_pred)
 
     fig, ax = plt.subplots(figsize=(10, 8))
-    sns.heatmap(matrix, annot=False, cmap="viridis",
+    sns.heatmap(matrix, cmap="viridis",
                 xticklabels=class_names, yticklabels=class_names, ax=ax)
     ax.set_title("Label Prediction Co-occurrence Heatmap")
     plt.tight_layout()
@@ -118,14 +107,14 @@ def compute_error_cooccurrence(y_true, y_pred):
     num_classes = y_true.shape[1]
     fp = (y_pred == 1) & (y_true == 0)
     fn = (y_pred == 0) & (y_true == 1)
-    errs = fp | fn
+    error_mask = fp | fn
 
-    matrix = np.zeros((num_classes, num_classes), dtype=float)
+    matrix = np.zeros((num_classes, num_classes))
 
     for i in range(num_classes):
-        idx = np.where(errs[:, i])[0]
+        idx = np.where(error_mask[:, i])[0]
         if len(idx) > 0:
-            matrix[i] = np.mean(errs[idx], axis=0)
+            matrix[i] = np.mean(error_mask[idx], axis=0)
 
     return matrix
 
@@ -134,7 +123,7 @@ def log_error_heatmap(y_true, y_pred, class_names, step):
     matrix = compute_error_cooccurrence(y_true, y_pred)
 
     fig, ax = plt.subplots(figsize=(10, 8))
-    sns.heatmap(matrix, annot=False, cmap="magma",
+    sns.heatmap(matrix, cmap="magma",
                 xticklabels=class_names, yticklabels=class_names, ax=ax)
     ax.set_title("FP/FN Error Co-occurrence Heatmap")
     plt.tight_layout()
@@ -144,22 +133,24 @@ def log_error_heatmap(y_true, y_pred, class_names, step):
 
 
 # ----------------------------------------------------------
-#              PRECISION–RECALL CURVES (WORKING in W&B 0.23)
+#              PRECISION–RECALL CURVES
+#         (SUPPORTED FORMAT FOR W&B 0.23.x)
 # ----------------------------------------------------------
 def log_precision_recall(y_true, y_probs, class_names, step):
     num_classes = y_true.shape[1]
 
     for i in range(num_classes):
         if y_true[:, i].sum() == 0:
-            continue  # avoid sklearn "no positive sample" warnings
+            continue
 
         precision, recall, _ = precision_recall_curve(y_true[:, i], y_probs[:, i])
 
+        table = wandb.Table(columns=["recall", "precision"])
+        for r, p in zip(recall, precision):
+            table.add_data(r, p)
+
         wandb.log({
-            f"pr_curves/{class_names[i]}": wandb.plot.line_series(
-                xs=recall.tolist(),
-                ys=[precision.tolist()],
-                keys=[class_names[i]],
-                title=f"PR Curve: {class_names[i]}"
-            )
+            f"pr_curves/{class_names[i]}":
+                wandb.plot.line(table, "recall", "precision",
+                                title=f"PR Curve: {class_names[i]}")
         }, step=step)

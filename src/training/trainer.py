@@ -1,8 +1,8 @@
 import torch
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, average_precision_score
 import numpy as np
-
 import wandb
+
 from src.training.wandb_utils import (
     log_metrics,
     log_example_image,
@@ -13,19 +13,12 @@ from src.training.wandb_utils import (
 )
 
 
-# ----------------------------------------------------------
-#                     CLASS LABELS
-# ----------------------------------------------------------
 CLASS_NAMES = [
     "Rock", "Electronic", "Pop", "Folk", "Instrumental", "HipHop",
     "International", "Classical", "Jazz", "Country", "Blues", "SoulRnB"
 ]
 
 
-# ----------------------------------------------------------
-#                    mAP CALCULATION
-# ----------------------------------------------------------
-from sklearn.metrics import average_precision_score
 def compute_map(y_true, y_pred_probs):
     aps = []
     for i in range(y_true.shape[1]):
@@ -36,9 +29,6 @@ def compute_map(y_true, y_pred_probs):
     return float(np.mean(aps)) if aps else 0.0
 
 
-# ----------------------------------------------------------
-#                    TRAINING LOOP
-# ----------------------------------------------------------
 def train_model(model, train_loader, valid_loader, device, epochs, lr):
 
     model = model.to(device)
@@ -111,7 +101,7 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr):
                             "fns": fn.tolist(),
                         })
 
-        # Convert lists to arrays
+        # Stack arrays
         all_targets = np.vstack(all_targets)
         all_preds = np.vstack(all_preds)
         all_probs = np.vstack(all_probs)
@@ -144,20 +134,17 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr):
 
         wandb.log({f"f1/class_{i}": v for i, v in enumerate(per_class_f1)}, step=epoch)
 
-        # Example mel spectrogram
-        example_mel = mel[0].detach().cpu().numpy()
-        log_example_image(example_mel, name="example_mel", step=epoch)
+        # Example mel spectrogram (colored)
+        log_example_image(mel[0].cpu().numpy(), name="example_mel", step=epoch)
 
         # Misclassified examples
         log_misclassified_examples(misclassified_examples, step=epoch)
 
-        # Confusion-style heatmap
+        # Heatmaps
         log_confusion_heatmap(all_targets, all_preds, CLASS_NAMES, step=epoch)
-
-        # Error co-occurrence heatmap
         log_error_heatmap(all_targets, all_preds, CLASS_NAMES, step=epoch)
 
-        # PR curves
+        # Precision–Recall curves
         log_precision_recall(all_targets, all_probs, CLASS_NAMES, step=epoch)
 
     return model
