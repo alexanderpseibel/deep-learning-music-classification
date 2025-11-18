@@ -25,6 +25,8 @@ init_wandb(config=cfg, project_name="NLP-mini-project")
 df = pd.read_csv(cfg["metadata_csv"])
 print("Loaded metadata rows:", len(df))
 
+if "limit_samples" in cfg:
+    df = df.sample(n=cfg["limit_samples"], random_state=42).reset_index(drop=True)
 
 # -------- Train/Validation Split --------
 # Multi-label stratification not possible → random shuffle split
