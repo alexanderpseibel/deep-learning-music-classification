@@ -19,27 +19,33 @@ def init_wandb(config: dict, project_name: str = "nlp-mini-project"):
 
 
 # ----------------------------------------------------------
-#         MEL → IMAGE (Fix black W&B outputs)
+#         MEL → COLROED IMAGE 
 # ----------------------------------------------------------
-def mel_to_image(mel):
+def mel_to_image(mel, cmap="viridis"):
     """
-    Convert raw mel spectrogram values to a proper uint8 image:
+    Convert raw mel spectrogram to a colored RGB image:
     - log scale
-    - normalize to [0, 255]
-    - return uint8 matrix
+    - normalize to [0,1]
+    - apply matplotlib colormap
+    - return uint8 RGB image
     """
     mel = np.array(mel)
 
     # Log transform
-    mel_log = np.log1p(np.maximum(mel, 1e-8))
+    mel_log = np.log1p(np.maximum(mel, 1e-9))
 
-    # Normalize
+    # Normalize 0–1
     mel_norm = (mel_log - mel_log.min()) / (mel_log.max() - mel_log.min() + 1e-8)
 
-    # Convert to uint8
-    mel_uint8 = (mel_norm * 255).astype(np.uint8)
+    # Apply colormap
+    colormap = plt.get_cmap(cmap)
+    mel_rgb = colormap(mel_norm)[:, :, :3]  # drop alpha channel
+
+    # Convert to uint8 [0,255]
+    mel_uint8 = (mel_rgb * 255).astype(np.uint8)
 
     return mel_uint8
+
 
 
 # ----------------------------------------------------------
