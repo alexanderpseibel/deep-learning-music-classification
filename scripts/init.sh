@@ -50,4 +50,8 @@ else
     echo "Skipping Jupyter kernel install on Windows."
 fi
 
+# Make the project root importable as "src"
+export PYTHONPATH="$(pwd):$PYTHONPATH"
+echo "PYTHONPATH set to: $PYTHONPATH"
+
 echo "Environment setup complete."
