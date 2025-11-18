@@ -1,3 +1,38 @@
+"""
+1. Core Metrics
+
+Train Loss
+
+Val Loss
+
+F1-micro
+
+F1-macro
+
+mAP
+
+Per-class F1
+
+
+2. Visual Diagnostics
+
+Example mel spectrogram (colored, readable!)
+
+Misclassified spectrograms (FP/FN listed)
+
+
+3. Heatmaps
+
+Label co-occurrence (multi-label confusion matrix)
+
+
+Error co-occurrence (which labels fail together)
+
+4. Curves
+
+Precision–Recall curve per genre label
+"""
+
 import wandb
 import os
 import numpy as np
@@ -22,22 +57,23 @@ def init_wandb(config: dict, project_name: str = "nlp-mini-project"):
 #         MEL → COLORED IMAGE (REAL SPECTROGRAM)
 # ----------------------------------------------------------
 def mel_to_image(mel, cmap="magma"):
+
     """
     Convert a raw mel-spectrogram (128×T float32 array)
     into a colored RGB uint8 image suitable for W&B.
     """
     mel = np.array(mel)
 
-    # Already in dB → normalize to 0–1
-    mel_norm = (mel - mel.min()) / (mel.max() - mel.min() + 1e-8)
+    # handle (1,128,T) from CNN input format
+    if mel.ndim == 3:
+        mel = mel.squeeze()
 
-    # Apply colormap
+    mel_norm = (mel - mel.min()) / (mel.max() - mel.min() + 1e-8)
     colormap = plt.get_cmap(cmap)
     mel_rgb = colormap(mel_norm)[:, :, :3]
-
-    # Convert to uint8 0–255
     mel_uint8 = (mel_rgb * 255).astype(np.uint8)
     return mel_uint8
+
 
 
 # ----------------------------------------------------------

@@ -93,8 +93,16 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr):
                     fn = np.where((p == 0) & (t == 1))[0]
 
                     if len(fp) > 0 or len(fn) > 0:
+
+                        # extract mel (shape: (1, 128, T))
+                        mel_i = mel[i].detach().cpu().numpy()
+
+                        # FIX: squeeze channel dimension → (128, T)
+                        if mel_i.ndim == 3:
+                            mel_i = mel_i.squeeze()
+
                         misclassified_examples.append({
-                            "mel": mel[i].detach().cpu().numpy(),
+                            "mel": mel_i,
                             "true": t,
                             "pred": p,
                             "fps": fp.tolist(),
@@ -135,7 +143,14 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr):
         wandb.log({f"f1/class_{i}": v for i, v in enumerate(per_class_f1)}, step=epoch)
 
         # Example mel spectrogram (colored)
-        log_example_image(mel[0].cpu().numpy(), name="example_mel", step=epoch)
+        example_mel = mel[0].detach().cpu().numpy()
+
+        # squeeze channel dimension (1,128,T → 128,T)
+        if example_mel.ndim == 3:
+            example_mel = example_mel.squeeze()
+
+        log_example_image(example_mel, name="example_mel", step=epoch)
+
 
         # Misclassified examples
         log_misclassified_examples(misclassified_examples, step=epoch)
