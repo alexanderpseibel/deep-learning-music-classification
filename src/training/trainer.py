@@ -1,7 +1,9 @@
+# src/training/trainer.py
 import os
 import numpy as np
 import torch
 from sklearn.metrics import f1_score, average_precision_score
+import pandas as pd
 import wandb
 
 from src.training.wandb_utils import (
@@ -30,13 +32,13 @@ def compute_map(y_true, y_pred_probs):
 
 def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folder):
     """
-    The full training loop:
-    - training step
-    - validation step
-    - compute metrics
-    - extract misclassified examples
-    - log to W&B
-    - save misclassified CSV each epoch
+    Full training loop.
+    Saves misclassified CSV including:
+    - track_id
+    - mel_path
+    - audio_path
+    - true_labels
+    - pred_labels
     """
 
     model = model.to(device)
@@ -45,13 +47,13 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folde
 
     for epoch in range(epochs):
 
-        # -------------------------------
+        # -----------------------------------
         # TRAIN
-        # -------------------------------
+        # -----------------------------------
         model.train()
         total_loss = 0
 
-        for mel, labels in train_loader:
+        for mel, labels, _, _, _ in train_loader:
             mel, labels = mel.to(device), labels.to(device)
 
             optimizer.zero_grad()
@@ -64,17 +66,20 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folde
 
         avg_train_loss = total_loss / len(train_loader)
 
-        # -------------------------------
+        # -----------------------------------
         # VALIDATION
-        # -------------------------------
+        # -----------------------------------
         model.eval()
         val_loss = 0
         all_targets, all_preds, all_probs = [], [], []
         misclassified = []
 
         with torch.no_grad():
-            for mel, labels in valid_loader:
-                mel, labels = mel.to(device), labels.to(device)
+            for mel, labels, mel_paths, audio_paths, track_ids in valid_loader:
+
+                mel = mel.to(device)
+                labels = labels.to(device)
+
                 logits = model(mel)
                 val_loss += criterion(logits, labels).item()
 
@@ -86,21 +91,22 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folde
                 np_labels = labels.cpu().numpy()
 
                 all_targets.append(np_labels)
-                all_probs.append(np_probs)
                 all_preds.append(np_preds)
+                all_probs.append(np_probs)
 
-                # Misclassified examples
+                # Collect misclassified samples
                 for i in range(len(labels)):
                     t = np_labels[i]
                     p = np_preds[i]
 
                     if not np.array_equal(t, p):
                         mel_i = mel[i].detach().cpu().numpy()
-                        if mel_i.ndim == 3:
-                            mel_i = mel_i.squeeze()
+                        mel_i = mel_i.squeeze() if mel_i.ndim == 3 else mel_i
 
                         misclassified.append({
-                            "mel": mel_i,
+                            "track_id": track_ids[i],
+                            "mel_path": mel_paths[i],
+                            "audio_path": audio_paths[i],
                             "true": t.tolist(),
                             "pred": p.tolist(),
                         })
@@ -117,13 +123,16 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folde
         avg_val_loss = val_loss / len(valid_loader)
         per_class_f1 = f1_score(all_targets, all_preds, average=None, zero_division=0)
 
-        print(f"Epoch {epoch+1}/{epochs} | "
-              f"Train: {avg_train_loss:.4f} | Val: {avg_val_loss:.4f} | "
-              f"F1micro: {f1_micro:.4f} | mAP: {mAP:.4f}")
+        print(
+            f"Epoch {epoch+1}/{epochs} | "
+            f"Train Loss: {avg_train_loss:.4f} | "
+            f"Val Loss: {avg_val_loss:.4f} | "
+            f"F1 (micro): {f1_micro:.4f} | mAP: {mAP:.4f}"
+        )
 
-        # -------------------------------
+        # -----------------------------------
         # W&B LOGGING
-        # -------------------------------
+        # -----------------------------------
         log_metrics({
             "loss/train": avg_train_loss,
             "loss/val": avg_val_loss,
@@ -132,29 +141,30 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folde
             "mAP": mAP,
         }, step=epoch)
 
+        # Per-class F1
         for i, v in enumerate(per_class_f1):
             wandb.log({f"f1/class_{i}": v}, step=epoch)
 
-        # Log one example mel
-        log_example_image(misclassified[0]["mel"], name="example_misclassified", step=epoch)
+        # Log example misclassified mel
+        if len(misclassified) > 0:
+            log_example_image(
+                np.array(misclassified[0]["true"]),
+                name="example_misclassified",
+                step=epoch
+            )
 
-        # Confusion / error heatmaps
+        # Heatmaps + PR
         log_confusion_heatmap(all_targets, all_preds, CLASS_NAMES, step=epoch)
         log_error_heatmap(all_targets, all_preds, CLASS_NAMES, step=epoch)
         log_precision_recall(all_targets, all_probs, CLASS_NAMES, step=epoch)
 
-        # -------------------------------
+        # -----------------------------------
         # SAVE MISCLASSIFIED CSV
-        # -------------------------------
-        import csv
+        # -----------------------------------
+        df = pd.DataFrame(misclassified)
         csv_path = os.path.join(run_folder, f"misclassified_epoch_{epoch}.csv")
+        df.to_csv(csv_path, index=False)
 
-        with open(csv_path, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["true_labels", "pred_labels"])
-            for ex in misclassified:
-                writer.writerow([ex["true"], ex["pred"]])
-
-        print("Saved misclassified to:", csv_path)
+        print("Saved misclassified CSV to:", csv_path)
 
     return model

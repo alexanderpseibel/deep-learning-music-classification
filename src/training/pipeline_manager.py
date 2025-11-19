@@ -10,6 +10,42 @@ from src.training.wandb_utils import init_wandb
 from src.training.trainer import train_model
 
 
+# ------------------------------------------------------------
+# Create incrementing run folder: run_001, run_002, ...
+# ------------------------------------------------------------
+def create_run_folder(base_dir):
+    """
+    Creates an incrementing run folder inside base_dir:
+    run_001, run_002, ...
+    """
+    os.makedirs(base_dir, exist_ok=True)
+
+    # list existing
+    existing = [
+        d for d in os.listdir(base_dir)
+        if d.startswith("run_") and os.path.isdir(os.path.join(base_dir, d))
+    ]
+
+    # extract run numbers
+    nums = []
+    for name in existing:
+        try:
+            nums.append(int(name.split("_")[1]))
+        except:
+            pass
+
+    next_num = max(nums) + 1 if nums else 1
+    folder_name = f"run_{next_num:03d}"
+
+    run_path = os.path.join(base_dir, folder_name)
+    os.makedirs(run_path)
+
+    return run_path
+
+
+# ------------------------------------------------------------
+#     General Training Pipeline (works for any model class)
+# ------------------------------------------------------------
 def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini-project"):
     """
     General training pipeline:
@@ -18,7 +54,7 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     - creates dataloaders
     - instantiates model_class
     - initializes W&B
-    - creates run folder (loggings/<run_id>)
+    - creates run folder (loggings/run_XXX)
     - calls the trainer
     """
 
@@ -27,10 +63,10 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     # --------------------------------------------------------
     cfg_paths = yaml.safe_load(open("configs/dataset_paths.yaml"))
     cfg_model = yaml.safe_load(open(model_config_path))
-    cfg = {**cfg_paths, **cfg_model}   # merge
+    cfg = {**cfg_paths, **cfg_model}
 
     # --------------------------------------------------------
-    # Load dataset metadata
+    # Load metadata
     # --------------------------------------------------------
     df = pd.read_csv(cfg["metadata_csv"])
     print("Loaded metadata rows:", len(df))
@@ -44,7 +80,7 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     train_df, valid_df = train_test_split(df, test_size=0.1, random_state=42)
 
     # --------------------------------------------------------
-    # Create datasets + dataloaders
+    # Datasets
     # --------------------------------------------------------
     train_ds = FMAAudioDataset(train_df)
     valid_ds = FMAAudioDataset(valid_df)
@@ -66,7 +102,7 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     )
 
     # --------------------------------------------------------
-    # Instantiate model
+    # Model
     # --------------------------------------------------------
     num_classes = len([c for c in df.columns if c.startswith("label_")])
     model = model_class(num_classes=num_classes)
@@ -78,26 +114,25 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     print("Training on:", device)
 
     # --------------------------------------------------------
-    # Initialize W&B
+    # W&B Init
     # --------------------------------------------------------
     run_config = init_wandb(config=cfg, project_name=project_name)
-    run_id = run_config.get("_wandb", {}).get("run_id", "run")
-    print("W&B Run ID:", run_id)
+
+    print("W&B run initialized.")
 
     # --------------------------------------------------------
-    # Create run folder for logs/misclassified/configs
+    # Create run folder
     # --------------------------------------------------------
     log_root = cfg["misclassified_examples"]
-    full_run_path = os.path.join(log_root, f"run_{run_id}")
-    os.makedirs(full_run_path, exist_ok=True)
+    run_folder = create_run_folder(log_root)
 
-    # Save the model config to the run folder
-    yaml.safe_dump(cfg, open(os.path.join(full_run_path, "config_used.yaml"), "w"))
+    print("Saving logs to:", run_folder)
 
-    print("Saving logs to:", full_run_path)
+    # Save config to run folder
+    yaml.safe_dump(cfg, open(os.path.join(run_folder, "config_used.yaml"), "w"))
 
     # --------------------------------------------------------
-    # Train loop (delegates to trainer)
+    # Training
     # --------------------------------------------------------
     train_model(
         model=model,
@@ -106,7 +141,7 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
         device=device,
         epochs=cfg["epochs"],
         lr=cfg["lr"],
-        run_folder=full_run_path
+        run_folder=run_folder
     )
 
     print("Training complete.")
