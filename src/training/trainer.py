@@ -1,6 +1,7 @@
+import os
+import numpy as np
 import torch
 from sklearn.metrics import f1_score, average_precision_score
-import numpy as np
 import wandb
 
 from src.training.wandb_utils import (
@@ -9,9 +10,7 @@ from src.training.wandb_utils import (
     log_confusion_heatmap,
     log_error_heatmap,
     log_precision_recall,
-    log_misclassified_examples,
 )
-
 
 CLASS_NAMES = [
     "Rock", "Electronic", "Pop", "Folk", "Instrumental", "HipHop",
@@ -29,7 +28,16 @@ def compute_map(y_true, y_pred_probs):
     return float(np.mean(aps)) if aps else 0.0
 
 
-def train_model(model, train_loader, valid_loader, device, epochs, lr):
+def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folder):
+    """
+    The full training loop:
+    - training step
+    - validation step
+    - compute metrics
+    - extract misclassified examples
+    - log to W&B
+    - save misclassified CSV each epoch
+    """
 
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -37,9 +45,9 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr):
 
     for epoch in range(epochs):
 
-        # ------------------------------
+        # -------------------------------
         # TRAIN
-        # ------------------------------
+        # -------------------------------
         model.train()
         total_loss = 0
 
@@ -56,20 +64,17 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr):
 
         avg_train_loss = total_loss / len(train_loader)
 
-        # ------------------------------
+        # -------------------------------
         # VALIDATION
-        # ------------------------------
+        # -------------------------------
         model.eval()
         val_loss = 0
-        all_preds = []
-        all_probs = []
-        all_targets = []
-        misclassified_examples = []
+        all_targets, all_preds, all_probs = [], [], []
+        misclassified = []
 
         with torch.no_grad():
             for mel, labels in valid_loader:
                 mel, labels = mel.to(device), labels.to(device)
-
                 logits = model(mel)
                 val_loss += criterion(logits, labels).item()
 
@@ -89,24 +94,15 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr):
                     t = np_labels[i]
                     p = np_preds[i]
 
-                    fp = np.where((p == 1) & (t == 0))[0]
-                    fn = np.where((p == 0) & (t == 1))[0]
-
-                    if len(fp) > 0 or len(fn) > 0:
-
-                        # extract mel (shape: (1, 128, T))
+                    if not np.array_equal(t, p):
                         mel_i = mel[i].detach().cpu().numpy()
-
-                        # FIX: squeeze channel dimension → (128, T)
                         if mel_i.ndim == 3:
                             mel_i = mel_i.squeeze()
 
-                        misclassified_examples.append({
+                        misclassified.append({
                             "mel": mel_i,
-                            "true": t,
-                            "pred": p,
-                            "fps": fp.tolist(),
-                            "fns": fn.tolist(),
+                            "true": t.tolist(),
+                            "pred": p.tolist(),
                         })
 
         # Stack arrays
@@ -118,20 +114,16 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr):
         f1_micro = f1_score(all_targets, all_preds, average="micro")
         f1_macro = f1_score(all_targets, all_preds, average="macro", zero_division=0)
         mAP = compute_map(all_targets, all_probs)
-        per_class_f1 = f1_score(all_targets, all_preds, average=None, zero_division=0)
         avg_val_loss = val_loss / len(valid_loader)
+        per_class_f1 = f1_score(all_targets, all_preds, average=None, zero_division=0)
 
-        print(
-            f"Epoch {epoch+1}/{epochs} | "
-            f"Train Loss: {avg_train_loss:.4f} | "
-            f"Val Loss: {avg_val_loss:.4f} | "
-            f"F1 (micro): {f1_micro:.4f} | "
-            f"mAP: {mAP:.4f}"
-        )
+        print(f"Epoch {epoch+1}/{epochs} | "
+              f"Train: {avg_train_loss:.4f} | Val: {avg_val_loss:.4f} | "
+              f"F1micro: {f1_micro:.4f} | mAP: {mAP:.4f}")
 
-        # ------------------------------
+        # -------------------------------
         # W&B LOGGING
-        # ------------------------------
+        # -------------------------------
         log_metrics({
             "loss/train": avg_train_loss,
             "loss/val": avg_val_loss,
@@ -140,26 +132,29 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr):
             "mAP": mAP,
         }, step=epoch)
 
-        wandb.log({f"f1/class_{i}": v for i, v in enumerate(per_class_f1)}, step=epoch)
+        for i, v in enumerate(per_class_f1):
+            wandb.log({f"f1/class_{i}": v}, step=epoch)
 
-        # Example mel spectrogram (colored)
-        example_mel = mel[0].detach().cpu().numpy()
+        # Log one example mel
+        log_example_image(misclassified[0]["mel"], name="example_misclassified", step=epoch)
 
-        # squeeze channel dimension (1,128,T → 128,T)
-        if example_mel.ndim == 3:
-            example_mel = example_mel.squeeze()
-
-        log_example_image(example_mel, name="example_mel", step=epoch)
-
-
-        # Misclassified examples
-        log_misclassified_examples(misclassified_examples, step=epoch)
-
-        # Heatmaps
+        # Confusion / error heatmaps
         log_confusion_heatmap(all_targets, all_preds, CLASS_NAMES, step=epoch)
         log_error_heatmap(all_targets, all_preds, CLASS_NAMES, step=epoch)
-
-        # Precision–Recall curves
         log_precision_recall(all_targets, all_probs, CLASS_NAMES, step=epoch)
+
+        # -------------------------------
+        # SAVE MISCLASSIFIED CSV
+        # -------------------------------
+        import csv
+        csv_path = os.path.join(run_folder, f"misclassified_epoch_{epoch}.csv")
+
+        with open(csv_path, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["true_labels", "pred_labels"])
+            for ex in misclassified:
+                writer.writerow([ex["true"], ex["pred"]])
+
+        print("Saved misclassified to:", csv_path)
 
     return model
