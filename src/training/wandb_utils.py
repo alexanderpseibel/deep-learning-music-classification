@@ -3,14 +3,11 @@ import wandb
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.metrics import precision_recall_curve
+from sklearn.metrics import precision_recall_curve, confusion_matrix
 
 
 def init_wandb(config: dict, project_name: str = "nlp-mini-project"):
-    wandb.init(
-        project=project_name,
-        config=config
-    )
+    wandb.init(project=project_name, config=config)
     return wandb.config
 
 
@@ -19,7 +16,7 @@ def log_metrics(metrics: dict, step=None):
 
 
 # ------------------------------------------------
-# CONFUSION HEATMAP
+# CO-OCCURRENCE CONFUSION
 # ------------------------------------------------
 def compute_confusion_cooccurrence(y_true, y_pred):
     num = y_true.shape[1]
@@ -33,14 +30,10 @@ def compute_confusion_cooccurrence(y_true, y_pred):
 
 def log_confusion_heatmap(y_true, y_pred, class_names, step):
     M = compute_confusion_cooccurrence(y_true, y_pred)
-
     fig, ax = plt.subplots(figsize=(8, 6))
     sns.heatmap(M, cmap="viridis",
-                xticklabels=class_names,
-                yticklabels=class_names,
-                ax=ax)
+                xticklabels=class_names, yticklabels=class_names, ax=ax)
     plt.tight_layout()
-
     wandb.log({"confusion/cooc": wandb.Image(fig)}, step=step)
     plt.close(fig)
 
@@ -64,14 +57,10 @@ def compute_error_cooccurrence(y_true, y_pred):
 
 def log_error_heatmap(y_true, y_pred, class_names, step):
     M = compute_error_cooccurrence(y_true, y_pred)
-
     fig, ax = plt.subplots(figsize=(8, 6))
     sns.heatmap(M, cmap="magma",
-                xticklabels=class_names,
-                yticklabels=class_names,
-                ax=ax)
+                xticklabels=class_names, yticklabels=class_names, ax=ax)
     plt.tight_layout()
-
     wandb.log({"confusion/error": wandb.Image(fig)}, step=step)
     plt.close(fig)
 
@@ -80,7 +69,6 @@ def log_error_heatmap(y_true, y_pred, class_names, step):
 # PRECISION–RECALL CURVES
 # ------------------------------------------------
 def log_precision_recall(y_true, y_probs, class_names, step):
-
     num_classes = y_true.shape[1]
 
     for i in range(num_classes):
@@ -98,3 +86,20 @@ def log_precision_recall(y_true, y_probs, class_names, step):
                 table, "recall", "precision", title=f"PR: {class_names[i]}"
             )
         }, step=step)
+
+
+# ------------------------------------------------
+# PER-CLASS BINARY CONFUSION MATRICES
+# ------------------------------------------------
+def log_binary_confusion_matrices(y_true, y_pred, class_names, step):
+    for i, cls in enumerate(class_names):
+        cm = confusion_matrix(y_true[:, i], y_pred[:, i])
+        fig, ax = plt.subplots(figsize=(3, 3))
+        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+                    xticklabels=["Pred 0", "Pred 1"],
+                    yticklabels=["True 0", "True 1"],
+                    ax=ax)
+        ax.set_title(f"Confusion: {cls}")
+        plt.tight_layout()
+        wandb.log({f"confusion/{cls}": wandb.Image(fig)}, step=step)
+        plt.close(fig)
