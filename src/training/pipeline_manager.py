@@ -4,6 +4,8 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
+from iterstrat.ml_stratifiers import MultilabelStratifiedShuffleSplit
+
 
 from src.data.fma_dataset import FMAAudioDataset
 from src.training.wandb_utils import init_wandb
@@ -77,7 +79,28 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     # --------------------------------------------------------
     # Train/valid split
     # --------------------------------------------------------
-    train_df, valid_df = train_test_split(df, test_size=0.1, random_state=42)
+
+    # Extract multilabel targets from the dataframe
+    label_cols = [c for c in df.columns if c.startswith("label_")]
+    y = df[label_cols].values
+
+    # Create splitter
+    splitter = MultilabelStratifiedShuffleSplit(
+        n_splits=1,
+        test_size=0.1,
+        random_state=42
+    )
+
+    # Perform stratified split
+    for train_idx, valid_idx in splitter.split(df, y):
+        train_df = df.iloc[train_idx].reset_index(drop=True)
+        valid_df = df.iloc[valid_idx].reset_index(drop=True)
+
+    print("TRAIN size:", len(train_df))
+    print("VALID size:", len(valid_df))
+    print("Positive counts per class (TRAIN):\n", train_df[label_cols].sum())
+    print("Positive counts per class (VALID):\n", valid_df[label_cols].sum())  
+
 
     # --------------------------------------------------------
     # Datasets
