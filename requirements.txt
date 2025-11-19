@@ -23,4 +23,4 @@ tqdm
 matplotlib
 wandb
 pyyaml
-iterstrat
+iterative-stratification
