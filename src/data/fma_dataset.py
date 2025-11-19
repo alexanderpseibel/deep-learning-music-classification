@@ -5,7 +5,7 @@ from torch.utils.data import Dataset
 
 class FMAAudioDataset(Dataset):
     """
-    Loads mel spectrogram + multi-hot labels + metadata.
+    Loads mel spectrogram + multi-hot labels.
     Ensures fixed time dimension via pad/crop.
     """
 
@@ -20,10 +20,6 @@ class FMAAudioDataset(Dataset):
         return len(self.df)
 
     def _fix_length(self, mel):
-        """
-        Crop/pad mel to TARGET_T.
-        mel: (128, T)
-        """
         _, T = mel.shape
 
         if T > self.TARGET_T:
@@ -39,25 +35,19 @@ class FMAAudioDataset(Dataset):
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
 
-        # --- Load mel ---
-        mel = np.load(row["mel_path"])         # shape (128, T)
+        # Load mel spectrogram
+        mel = np.load(row["mel_path"])
         mel = self._fix_length(mel)
-        mel = torch.tensor(mel, dtype=torch.float32).unsqueeze(0)  # → (1,128,T)
+        mel = torch.tensor(mel, dtype=torch.float32).unsqueeze(0)  # (1,128,T)
 
-        # --- Load labels ---
+        # Load multi-hot labels
         labels = torch.tensor(
             row[self.label_cols].values.astype(np.float32)
         )
 
-        # Optional transform
+        # Apply transforms if any
         if self.transform:
             mel = self.transform(mel)
 
-        # ---- RETURN PATHS AND TRACK ID TOO ----
-        return (
-            mel, 
-            labels, 
-            row["mel_path"], 
-            row["audio_path"], 
-            row["track_id"]
-        )
+        # Return ONLY mel + labels
+        return mel, labels
