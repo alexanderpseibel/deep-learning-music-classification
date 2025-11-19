@@ -1,4 +1,4 @@
-from src.pipeline_manager import run_training_pipeline
+from src.training.pipeline_manager import run_training_pipeline
 from src.models.simple_cnn import SimpleCNN
 
 # Just call the pipeline
