@@ -1,6 +1,6 @@
-epochs: 2
+epochs: 5
 lr: 0.001
-limit_samples: 100
+limit_samples: 200
 model: "SimpleCNN"
 batch_size: 16
 num_workers: 8
