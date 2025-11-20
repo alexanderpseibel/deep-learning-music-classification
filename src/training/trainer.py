@@ -185,8 +185,8 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folde
             "mAP": mAP,
             "auc/macro": auc_macro,
             "auc/micro": auc_micro,
-            "ranking/loss": ranking_loss,
-            "recall@3": recall3
+            "ranking/loss": lrl,
+            "recall@3": r3
         }, step=epoch)
 
 
