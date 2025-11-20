@@ -198,6 +198,17 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folde
         # Single log call with all metrics
         wandb.log(log_dict, step=epoch)
 
+        # Create custom combined loss chart
+        wandb.log({
+            "loss_combined": wandb.plot.line_series(
+                xs=[epoch],
+                ys=[[avg_train_loss], [avg_val_loss]],
+                keys=["train", "val"],
+                title="Combined Loss",
+                xname="Epoch"
+            )
+        })
+
         # diagnostics (these are separate because they log images)
         log_confusion_heatmap(all_targets, all_preds, CLASS_NAMES, step=epoch)
         log_error_heatmap(all_targets, all_preds, CLASS_NAMES, step=epoch)
