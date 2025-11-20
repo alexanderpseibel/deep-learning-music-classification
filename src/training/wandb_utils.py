@@ -1,11 +1,51 @@
 # src/training/wandb_utils.py
+
 import wandb
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.metrics import precision_recall_curve, confusion_matrix
+from sklearn.metrics import (
+    precision_recall_curve,
+    confusion_matrix,
+    average_precision_score
+)
+
+# ---------------------------------------------------------
+# Compute mAP + per-class AP
+# ---------------------------------------------------------
+def compute_map_and_per_class_ap(y_true, y_pred_probs):
+    per_class_ap = []
+    for i in range(y_true.shape[1]):
+        try:
+            ap = average_precision_score(y_true[:, i], y_pred_probs[:, i])
+        except ValueError:
+            ap = np.nan
+        per_class_ap.append(ap)
+
+    mAP = float(np.nanmean(per_class_ap))
+    return mAP, per_class_ap
 
 
+# ---------------------------------------------------------
+# Recall@K
+# ---------------------------------------------------------
+def recall_at_k(y_true, y_probs, k=3):
+    topk_idx = np.argsort(-y_probs, axis=1)[:, :k]
+
+    recalls = []
+    for true_row, topk in zip(y_true, topk_idx):
+        true_labels = np.where(true_row == 1)[0]
+        if len(true_labels) == 0:
+            continue
+        hits = sum(1 for t in true_labels if t in topk)
+        recalls.append(hits / len(true_labels))
+
+    return float(np.mean(recalls)) if recalls else 0.0
+
+
+# ------------------------------------------------
+# W&B basic logging
+# ------------------------------------------------
 def init_wandb(config: dict, project_name: str = "nlp-mini-project"):
     wandb.init(project=project_name, config=config)
     return wandb.config
@@ -31,8 +71,10 @@ def compute_confusion_cooccurrence(y_true, y_pred):
 def log_confusion_heatmap(y_true, y_pred, class_names, step):
     M = compute_confusion_cooccurrence(y_true, y_pred)
     fig, ax = plt.subplots(figsize=(8, 6))
-    sns.heatmap(M, cmap="viridis",
-                xticklabels=class_names, yticklabels=class_names, ax=ax)
+    sns.heatmap(
+        M, cmap="viridis",
+        xticklabels=class_names, yticklabels=class_names, ax=ax
+    )
     plt.tight_layout()
     wandb.log({"confusion/cooc": wandb.Image(fig)}, step=step)
     plt.close(fig)
@@ -58,8 +100,10 @@ def compute_error_cooccurrence(y_true, y_pred):
 def log_error_heatmap(y_true, y_pred, class_names, step):
     M = compute_error_cooccurrence(y_true, y_pred)
     fig, ax = plt.subplots(figsize=(8, 6))
-    sns.heatmap(M, cmap="magma",
-                xticklabels=class_names, yticklabels=class_names, ax=ax)
+    sns.heatmap(
+        M, cmap="magma",
+        xticklabels=class_names, yticklabels=class_names, ax=ax
+    )
     plt.tight_layout()
     wandb.log({"confusion/error": wandb.Image(fig)}, step=step)
     plt.close(fig)
@@ -73,7 +117,7 @@ def log_precision_recall(y_true, y_probs, class_names, step):
 
     for i in range(num_classes):
         if y_true[:, i].sum() == 0:
-            continue
+            continue  # skip empty class
 
         prec, rec, _ = precision_recall_curve(y_true[:, i], y_probs[:, i])
 
@@ -83,22 +127,25 @@ def log_precision_recall(y_true, y_probs, class_names, step):
 
         wandb.log({
             f"pr/{class_names[i]}": wandb.plot.line(
-                table, "recall", "precision", title=f"PR: {class_names[i]}"
+                table, "recall", "precision",
+                title=f"PR: {class_names[i]}"
             )
         }, step=step)
 
 
 # ------------------------------------------------
-# PER-CLASS BINARY CONFUSION MATRICES
+# PER-CLASS BINARY CONF MATRICES
 # ------------------------------------------------
 def log_binary_confusion_matrices(y_true, y_pred, class_names, step):
     for i, cls in enumerate(class_names):
         cm = confusion_matrix(y_true[:, i], y_pred[:, i])
         fig, ax = plt.subplots(figsize=(3, 3))
-        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
-                    xticklabels=["Pred 0", "Pred 1"],
-                    yticklabels=["True 0", "True 1"],
-                    ax=ax)
+        sns.heatmap(
+            cm, annot=True, fmt="d", cmap="Blues",
+            xticklabels=["Pred 0", "Pred 1"],
+            yticklabels=["True 0", "True 1"],
+            ax=ax
+        )
         ax.set_title(f"Confusion: {cls}")
         plt.tight_layout()
         wandb.log({f"confusion/{cls}": wandb.Image(fig)}, step=step)

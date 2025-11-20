@@ -28,16 +28,22 @@ CLASS_NAMES = [
 
 
 # ---------------------------------------------------------
-# Compute mAP
+# Compute mAP and AP per class
 # ---------------------------------------------------------
-def compute_map(y_true, y_pred_probs):
-    aps = []
+
+def compute_map_and_per_class_ap(y_true, y_pred_probs):
+    per_class_ap = []
+
     for i in range(y_true.shape[1]):
         try:
-            aps.append(average_precision_score(y_true[:, i], y_pred_probs[:, i]))
+            ap = average_precision_score(y_true[:, i], y_pred_probs[:, i])
         except ValueError:
-            pass
-    return float(np.mean(aps)) if aps else 0.0
+            ap = np.nan
+        per_class_ap.append(ap)
+
+    mAP = float(np.nanmean(per_class_ap))
+    return mAP, per_class_ap
+
 
 
 # ---------------------------------------------------------
@@ -143,7 +149,7 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folde
         f1_macro = f1_score(all_targets, all_preds, average="macro")
         per_class_f1 = f1_score(all_targets, all_preds, average=None)
 
-        mAP = compute_map(all_targets, all_probs)
+        mAP, per_class_ap = compute_map_and_per_class_ap(all_targets, all_probs)
 
         # AUC (use try/except because some classes may be constant)
         try:
@@ -169,22 +175,28 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folde
         # =====================================================
         #                  W&B LOGGING
         # =====================================================
-        log_metrics({
-            "loss.train": avg_train_loss,
-            "loss.val": avg_val_loss,
+        wandb.log({
+            "loss": {
+                "train": avg_train_loss,
+                "val": avg_val_loss
+            },
             "f1/micro": f1_micro,
             "f1/macro": f1_macro,
             "mAP": mAP,
             "auc/macro": auc_macro,
             "auc/micro": auc_micro,
-            "ranking/loss": lrl,
-            "recall@3": r3
+            "ranking/loss": ranking_loss,
+            "recall@3": recall3
         }, step=epoch)
 
 
         # per-class f1
         for i, v in enumerate(per_class_f1):
             wandb.log({f"f1/{CLASS_NAMES[i]}": v}, step=epoch)
+        
+        # per-class AP
+        for i, ap in enumerate(per_class_ap):
+            wandb.log({f"AP/{CLASS_NAMES[i]}": ap}, step=epoch)
 
         # diagnostics
         log_confusion_heatmap(all_targets, all_preds, CLASS_NAMES, step=epoch)

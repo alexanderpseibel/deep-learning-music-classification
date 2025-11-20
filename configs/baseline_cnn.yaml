@@ -1,5 +1,5 @@
 model: "BaselineCNN"
-limit_samples: 90086 
+limit_samples: 500 
 epochs: 25
 lr: 0.0003
 batch_size: 32
