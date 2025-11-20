@@ -188,6 +188,20 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folde
         # Single log call
         wandb.log(log_dict)
 
+        wandb.log({
+            "Loss Curve": wandb.plot.line_series(
+                xs=list(range(epoch + 1)),
+                ys=[
+                    [loss_train_history[i] for i in range(epoch + 1)],
+                    [loss_val_history[i] for i in range(epoch + 1)],
+                ],
+                keys=["train", "val"],
+                title="Training & Validation Loss",
+                xname="Epoch"
+            )
+        })
+
+
         # =====================================================
         # Diagnostic visualizations (NO step argument!)
         # =====================================================
