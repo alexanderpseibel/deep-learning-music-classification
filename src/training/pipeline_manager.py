@@ -2,6 +2,7 @@ import os
 import yaml
 import pandas as pd
 import torch
+import wandb
 from torch.utils.data import DataLoader
 from iterstrat.ml_stratifiers import MultilabelStratifiedShuffleSplit
 
@@ -140,6 +141,11 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     # --------------------------------------------------------
     run_config = init_wandb(config=cfg, project_name=project_name)
     print("W&B run initialized.")
+
+    # Tell W&B to use epoch as x-axis for all loss/* metrics
+    wandb.define_metric("epoch")
+    wandb.define_metric("loss/*", step_metric="epoch")
+
 
     # --------------------------------------------------------
     # Create run folder
