@@ -43,21 +43,21 @@ def recall_at_k(y_true, y_probs, k=3):
     return float(np.mean(recalls)) if recalls else 0.0
 
 
-# ------------------------------------------------
+# ---------------------------------------------------------
 # W&B basic logging
-# ------------------------------------------------
+# ---------------------------------------------------------
 def init_wandb(config: dict, project_name: str = "nlp-mini-project"):
     wandb.init(project=project_name, config=config)
     return wandb.config
 
 
-def log_metrics(metrics: dict, step=None):
-    wandb.log(metrics, step=step)
+def log_metrics(metrics: dict):
+    wandb.log(metrics)
 
 
-# ------------------------------------------------
+# ---------------------------------------------------------
 # CO-OCCURRENCE CONFUSION
-# ------------------------------------------------
+# ---------------------------------------------------------
 def compute_confusion_cooccurrence(y_true, y_pred):
     num = y_true.shape[1]
     M = np.zeros((num, num))
@@ -68,21 +68,23 @@ def compute_confusion_cooccurrence(y_true, y_pred):
     return M
 
 
-def log_confusion_heatmap(y_true, y_pred, class_names, step):
+def log_confusion_heatmap(y_true, y_pred, class_names):
     M = compute_confusion_cooccurrence(y_true, y_pred)
     fig, ax = plt.subplots(figsize=(8, 6))
     sns.heatmap(
         M, cmap="viridis",
-        xticklabels=class_names, yticklabels=class_names, ax=ax
+        xticklabels=class_names,
+        yticklabels=class_names,
+        ax=ax
     )
     plt.tight_layout()
-    wandb.log({"confusion/cooc": wandb.Image(fig)}, step=step)
+    wandb.log({"confusion/cooc": wandb.Image(fig)})
     plt.close(fig)
 
 
-# ------------------------------------------------
+# ---------------------------------------------------------
 # ERROR HEATMAP
-# ------------------------------------------------
+# ---------------------------------------------------------
 def compute_error_cooccurrence(y_true, y_pred):
     fp = (y_pred == 1) & (y_true == 0)
     fn = (y_pred == 0) & (y_true == 1)
@@ -97,22 +99,24 @@ def compute_error_cooccurrence(y_true, y_pred):
     return M
 
 
-def log_error_heatmap(y_true, y_pred, class_names, step):
+def log_error_heatmap(y_true, y_pred, class_names):
     M = compute_error_cooccurrence(y_true, y_pred)
     fig, ax = plt.subplots(figsize=(8, 6))
     sns.heatmap(
         M, cmap="magma",
-        xticklabels=class_names, yticklabels=class_names, ax=ax
+        xticklabels=class_names,
+        yticklabels=class_names,
+        ax=ax
     )
     plt.tight_layout()
-    wandb.log({"confusion/error": wandb.Image(fig)}, step=step)
+    wandb.log({"confusion/error": wandb.Image(fig)})
     plt.close(fig)
 
 
-# ------------------------------------------------
+# ---------------------------------------------------------
 # PRECISION–RECALL CURVES
-# ------------------------------------------------
-def log_precision_recall(y_true, y_probs, class_names, step):
+# ---------------------------------------------------------
+def log_precision_recall(y_true, y_probs, class_names):
     num_classes = y_true.shape[1]
 
     for i in range(num_classes):
@@ -130,13 +134,13 @@ def log_precision_recall(y_true, y_probs, class_names, step):
                 table, "recall", "precision",
                 title=f"PR: {class_names[i]}"
             )
-        }, step=step)
+        })
 
 
-# ------------------------------------------------
+# ---------------------------------------------------------
 # PER-CLASS BINARY CONF MATRICES
-# ------------------------------------------------
-def log_binary_confusion_matrices(y_true, y_pred, class_names, step):
+# ---------------------------------------------------------
+def log_binary_confusion_matrices(y_true, y_pred, class_names):
     for i, cls in enumerate(class_names):
         cm = confusion_matrix(y_true[:, i], y_pred[:, i])
         fig, ax = plt.subplots(figsize=(3, 3))
@@ -148,5 +152,5 @@ def log_binary_confusion_matrices(y_true, y_pred, class_names, step):
         )
         ax.set_title(f"Confusion: {cls}")
         plt.tight_layout()
-        wandb.log({f"confusion/{cls}": wandb.Image(fig)}, step=step)
+        wandb.log({f"confusion/{cls}": wandb.Image(fig)})
         plt.close(fig)

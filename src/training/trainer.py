@@ -30,7 +30,6 @@ CLASS_NAMES = [
 # ---------------------------------------------------------
 # Compute mAP and AP per class
 # ---------------------------------------------------------
-
 def compute_map_and_per_class_ap(y_true, y_pred_probs):
     per_class_ap = []
 
@@ -45,16 +44,10 @@ def compute_map_and_per_class_ap(y_true, y_pred_probs):
     return mAP, per_class_ap
 
 
-
 # ---------------------------------------------------------
 # Recall@K
 # ---------------------------------------------------------
 def recall_at_k(y_true, y_probs, k=3):
-    """
-    For each sample:
-      take top-k predictions
-      compute fraction of true labels retrieved
-    """
     topk_idx = np.argsort(-y_probs, axis=1)[:, :k]
 
     recalls = []
@@ -62,7 +55,7 @@ def recall_at_k(y_true, y_probs, k=3):
         true_labels = np.where(true_row == 1)[0]
         if len(true_labels) == 0:
             continue
-        hits = sum([1 for t in true_labels if t in topk])
+        hits = sum(t in topk for t in true_labels)
         recalls.append(hits / len(true_labels))
 
     return float(np.mean(recalls)) if recalls else 0.0
@@ -151,20 +144,17 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folde
 
         mAP, per_class_ap = compute_map_and_per_class_ap(all_targets, all_probs)
 
-        # AUC (use try/except because some classes may be constant)
         try:
             auc_macro = roc_auc_score(all_targets, all_probs, average="macro")
-        except:
+        except ValueError:
             auc_macro = 0.0
+
         try:
             auc_micro = roc_auc_score(all_targets, all_probs, average="micro")
-        except:
+        except ValueError:
             auc_micro = 0.0
 
-        # Label ranking loss
         lrl = label_ranking_loss(all_targets, all_probs)
-
-        # Recall@3
         r3 = recall_at_k(all_targets, all_probs, k=3)
 
         print(
@@ -188,24 +178,25 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folde
             "recall@3": r3
         }
 
-        # per-class f1
+        # per-class f1 + AP
         for i, v in enumerate(per_class_f1):
             log_dict[f"f1/{CLASS_NAMES[i]}"] = v
-        
-        # per-class AP
+
         for i, ap in enumerate(per_class_ap):
             log_dict[f"AP/{CLASS_NAMES[i]}"] = ap
-        
-        # Single log call with all metrics
+
+        # Single log call
         wandb.log(log_dict)
 
-        # diagnostics (these are separate because they log images)
-        log_confusion_heatmap(all_targets, all_preds, CLASS_NAMES, step=epoch)
-        log_error_heatmap(all_targets, all_preds, CLASS_NAMES, step=epoch)
-        log_precision_recall(all_targets, all_probs, CLASS_NAMES, step=epoch)
-        log_binary_confusion_matrices(all_targets, all_preds, CLASS_NAMES, step=epoch)
+        # =====================================================
+        # Diagnostic visualizations (NO step argument!)
+        # =====================================================
+        log_confusion_heatmap(all_targets, all_preds, CLASS_NAMES)
+        log_error_heatmap(all_targets, all_preds, CLASS_NAMES)
+        log_precision_recall(all_targets, all_probs, CLASS_NAMES)
+        log_binary_confusion_matrices(all_targets, all_preds, CLASS_NAMES)
 
-        # save misclassified
+        # Save misclassified examples
         csv_path = os.path.join(run_folder, f"misclassified_epoch_{epoch}.csv")
         with open(csv_path, "w", newline="") as f:
             writer = csv.writer(f)
