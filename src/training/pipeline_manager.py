@@ -14,10 +14,6 @@ from src.training.trainer import train_model
 # Create incrementing run folder: run_001, run_002, ...
 # ------------------------------------------------------------
 def create_run_folder(base_dir):
-    """
-    Creates an incrementing run folder inside base_dir:
-    run_001, run_002, ...
-    """
     os.makedirs(base_dir, exist_ok=True)
 
     existing = [
@@ -42,19 +38,9 @@ def create_run_folder(base_dir):
 
 
 # ------------------------------------------------------------
-#     General Training Pipeline (works for any model class)
+# General Training Pipeline
 # ------------------------------------------------------------
 def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini-project"):
-    """
-    General training pipeline:
-    - loads dataset configs
-    - loads model configs
-    - creates dataloaders
-    - instantiates model_class
-    - initializes W&B
-    - creates run folder (loggings/run_XXX)
-    - calls the trainer
-    """
 
     # --------------------------------------------------------
     # Load YAML configs
@@ -70,7 +56,7 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     print("Loaded metadata rows:", len(df))
 
     # --------------------------------------------------------
-    # Balanced subset selection (NEW)
+    # Balanced subset selection (if subset_size is set)
     # --------------------------------------------------------
     if "subset_size" in cfg and cfg["subset_size"] is not None:
         subset_size = cfg["subset_size"]
@@ -79,9 +65,13 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
         label_cols = [c for c in df.columns if c.startswith("label_")]
         y_full = df[label_cols].values
 
+        # fraction of dataset to select
+        train_fraction = subset_size / len(df)
+
         splitter = MultilabelStratifiedShuffleSplit(
             n_splits=1,
-            train_size=subset_size,
+            train_size=train_fraction,
+            test_size=1 - train_fraction,
             random_state=42
         )
 
@@ -90,10 +80,8 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
 
         print(f"Balanced subset selected: {len(df)} samples.")
 
-    # (Old random sampling removed)
-
     # --------------------------------------------------------
-    # Train/valid split (still stratified)
+    # Train/valid split
     # --------------------------------------------------------
     label_cols = [c for c in df.columns if c.startswith("label_")]
     y = df[label_cols].values
