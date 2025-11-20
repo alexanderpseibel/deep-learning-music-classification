@@ -176,10 +176,8 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folde
         #                  W&B LOGGING
         # =====================================================
         wandb.log({
-            "loss": {
-                "train": avg_train_loss,
-                "val": avg_val_loss
-            },
+            "loss/train": avg_train_loss,
+            "loss/val": avg_val_loss,
             "f1/micro": f1_micro,
             "f1/macro": f1_macro,
             "mAP": mAP,
@@ -188,7 +186,6 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folde
             "ranking/loss": lrl,
             "recall@3": r3
         }, step=epoch)
-
 
         # per-class f1
         for i, v in enumerate(per_class_f1):

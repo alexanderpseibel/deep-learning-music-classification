@@ -3,9 +3,7 @@ import yaml
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
-from sklearn.model_selection import train_test_split
 from iterstrat.ml_stratifiers import MultilabelStratifiedShuffleSplit
-
 
 from src.data.fma_dataset import FMAAudioDataset
 from src.training.wandb_utils import init_wandb
@@ -22,13 +20,11 @@ def create_run_folder(base_dir):
     """
     os.makedirs(base_dir, exist_ok=True)
 
-    # list existing
     existing = [
         d for d in os.listdir(base_dir)
         if d.startswith("run_") and os.path.isdir(os.path.join(base_dir, d))
     ]
 
-    # extract run numbers
     nums = []
     for name in existing:
         try:
@@ -73,25 +69,41 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     df = pd.read_csv(cfg["metadata_csv"])
     print("Loaded metadata rows:", len(df))
 
-    if "limit_samples" in cfg:
-        df = df.sample(cfg["limit_samples"], random_state=42).reset_index(drop=True)
+    # --------------------------------------------------------
+    # Balanced subset selection (NEW)
+    # --------------------------------------------------------
+    if "subset_size" in cfg and cfg["subset_size"] is not None:
+        subset_size = cfg["subset_size"]
+        print(f"Selecting balanced subset of size {subset_size}...")
+
+        label_cols = [c for c in df.columns if c.startswith("label_")]
+        y_full = df[label_cols].values
+
+        splitter = MultilabelStratifiedShuffleSplit(
+            n_splits=1,
+            train_size=subset_size,
+            random_state=42
+        )
+
+        subset_idx, _ = next(splitter.split(df, y_full))
+        df = df.iloc[subset_idx].reset_index(drop=True)
+
+        print(f"Balanced subset selected: {len(df)} samples.")
+
+    # (Old random sampling removed)
 
     # --------------------------------------------------------
-    # Train/valid split
+    # Train/valid split (still stratified)
     # --------------------------------------------------------
-
-    # Extract multilabel targets from the dataframe
     label_cols = [c for c in df.columns if c.startswith("label_")]
     y = df[label_cols].values
 
-    # Create splitter
     splitter = MultilabelStratifiedShuffleSplit(
         n_splits=1,
         test_size=0.1,
         random_state=42
     )
 
-    # Perform stratified split
     for train_idx, valid_idx in splitter.split(df, y):
         train_df = df.iloc[train_idx].reset_index(drop=True)
         valid_df = df.iloc[valid_idx].reset_index(drop=True)
@@ -99,8 +111,7 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     print("TRAIN size:", len(train_df))
     print("VALID size:", len(valid_df))
     print("Positive counts per class (TRAIN):\n", train_df[label_cols].sum())
-    print("Positive counts per class (VALID):\n", valid_df[label_cols].sum())  
-
+    print("Positive counts per class (VALID):\n", valid_df[label_cols].sum())
 
     # --------------------------------------------------------
     # Datasets
@@ -140,7 +151,6 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     # W&B Init
     # --------------------------------------------------------
     run_config = init_wandb(config=cfg, project_name=project_name)
-
     print("W&B run initialized.")
 
     # --------------------------------------------------------
@@ -150,8 +160,6 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     run_folder = create_run_folder(log_root)
 
     print("Saving logs to:", run_folder)
-
-    # Save config to run folder
     yaml.safe_dump(cfg, open(os.path.join(run_folder, "config_used.yaml"), "w"))
 
     # --------------------------------------------------------
