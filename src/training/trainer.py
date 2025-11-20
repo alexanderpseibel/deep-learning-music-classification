@@ -175,7 +175,7 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folde
         # =====================================================
         #                  W&B LOGGING
         # =====================================================
-        wandb.log({
+        log_dict = {
             "loss/train": avg_train_loss,
             "loss/val": avg_val_loss,
             "f1/micro": f1_micro,
@@ -185,17 +185,20 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folde
             "auc/micro": auc_micro,
             "ranking/loss": lrl,
             "recall@3": r3
-        }, step=epoch)
+        }
 
         # per-class f1
         for i, v in enumerate(per_class_f1):
-            wandb.log({f"f1/{CLASS_NAMES[i]}": v}, step=epoch)
+            log_dict[f"f1/{CLASS_NAMES[i]}"] = v
         
         # per-class AP
         for i, ap in enumerate(per_class_ap):
-            wandb.log({f"AP/{CLASS_NAMES[i]}": ap}, step=epoch)
+            log_dict[f"AP/{CLASS_NAMES[i]}"] = ap
+        
+        # Single log call with all metrics
+        wandb.log(log_dict, step=epoch)
 
-        # diagnostics
+        # diagnostics (these are separate because they log images)
         log_confusion_heatmap(all_targets, all_preds, CLASS_NAMES, step=epoch)
         log_error_heatmap(all_targets, all_preds, CLASS_NAMES, step=epoch)
         log_precision_recall(all_targets, all_probs, CLASS_NAMES, step=epoch)
