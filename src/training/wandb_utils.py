@@ -57,6 +57,15 @@ def init_wandb(config: dict, project_name: str = "nlp-mini-project"):
     )
     return wandb.config
 
+# ---------------------------------------------------------
+# Basic metric logging (needed by pipeline_manager)
+# ---------------------------------------------------------
+def log_metrics(metrics: dict):
+    try:
+        wandb.log(metrics)
+    except Exception as e:
+        print(f"[WARN] WANDB metric log failed: {e}")
+
 
 # ---------------------------------------------------------
 # CO-OCCURRENCE CONFUSION
