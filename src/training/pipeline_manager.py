@@ -83,35 +83,33 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     # --------------------------------------------------------
     # Balanced subset selection (if subset_size is set)
     # --------------------------------------------------------
-    # --------------------------------------------------------
-# Balanced subset selection (if subset_size is set)
-# --------------------------------------------------------
-if "subset_size" in cfg and cfg["subset_size"] is not None:
-    subset_size = cfg["subset_size"]
-    total_samples = len(df)
 
-    # If subset_size == full dataset, skip selection
-    if subset_size >= total_samples:
-        print(f"subset_size == dataset size ({total_samples}). Skipping subset selection.")
-    else:
-        print(f"Selecting balanced subset of size {subset_size}...")
+    if "subset_size" in cfg and cfg["subset_size"] is not None:
+        subset_size = cfg["subset_size"]
+        total_samples = len(df)
 
-        label_cols = [c for c in df.columns if c.startswith("label_")]
-        y_full = df[label_cols].values
+        # If subset_size == full dataset, skip selection
+        if subset_size >= total_samples:
+            print(f"subset_size == dataset size ({total_samples}). Skipping subset selection.")
+        else:
+            print(f"Selecting balanced subset of size {subset_size}...")
 
-        train_fraction = subset_size / total_samples
+            label_cols = [c for c in df.columns if c.startswith("label_")]
+            y_full = df[label_cols].values
 
-        splitter = MultilabelStratifiedShuffleSplit(
-            n_splits=1,
-            train_size=train_fraction,
-            test_size=1 - train_fraction,
-            random_state=seed,
-        )
+            train_fraction = subset_size / total_samples
 
-        subset_idx, _ = next(splitter.split(df, y_full))
-        df = df.iloc[subset_idx].reset_index(drop=True)
+            splitter = MultilabelStratifiedShuffleSplit(
+                n_splits=1,
+                train_size=train_fraction,
+                test_size=1 - train_fraction,
+                random_state=seed,
+            )
 
-        print(f"Balanced subset selected: {len(df)} samples.")
+            subset_idx, _ = next(splitter.split(df, y_full))
+            df = df.iloc[subset_idx].reset_index(drop=True)
+
+            print(f"Balanced subset selected: {len(df)} samples.")
 
     # --------------------------------------------------------
     # Train/valid split
