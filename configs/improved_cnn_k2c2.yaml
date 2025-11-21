@@ -1,6 +1,6 @@
 model: "ImprovedK2C2CNN"
 subset_size: 20000
-epochs: 10
+epochs: 20
 lr: 0.0003
 batch_size: 32
 num_workers: 16
