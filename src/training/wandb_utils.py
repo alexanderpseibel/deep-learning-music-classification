@@ -47,8 +47,9 @@ def recall_at_k(y_true, y_probs, k=3):
 # W&B basic logging
 # ---------------------------------------------------------
 def init_wandb(config: dict, project_name: str = "nlp-mini-project"):
-
     import os
+
+    # Extend W&B backend wait time to avoid ReadTimeout crashes
     os.environ["WANDB__SERVICE_WAIT"] = "300"
     os.environ["WANDB__SERVICE_TIMEOUT"] = "300"
     os.environ["WANDB__SERVER_INTERNAL"] = "true"
@@ -56,13 +57,11 @@ def init_wandb(config: dict, project_name: str = "nlp-mini-project"):
 
     wandb.init(
         project=project_name,
-        config=config,
-        # Increase W&B timeouts to avoid ReadTimeout crashes
-        settings=wandb.Settings(
-            _service_timeout=300
-        )
+        config=config
     )
+
     return wandb.config
+
 
 # ---------------------------------------------------------
 # Basic metric logging (needed by pipeline_manager)
