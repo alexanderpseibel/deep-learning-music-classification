@@ -2,7 +2,7 @@ model: "ImprovedK2C2CNN"
 seed: 42
 subset_size: 20000
 epochs: 20
-lr: 0.001 #0.0005
+lr: 0.0001
 weight_decay: 0.0001 
 batch_size: 32
 num_workers: 16
