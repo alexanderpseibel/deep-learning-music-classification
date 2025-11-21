@@ -47,6 +47,13 @@ def recall_at_k(y_true, y_probs, k=3):
 # W&B basic logging
 # ---------------------------------------------------------
 def init_wandb(config: dict, project_name: str = "nlp-mini-project"):
+
+    import os
+    os.environ["WANDB__SERVICE_WAIT"] = "300"
+    os.environ["WANDB__SERVICE_TIMEOUT"] = "300"
+    os.environ["WANDB__SERVER_INTERNAL"] = "true"
+    os.environ["WANDB_SYNC_TIMEOUT"] = "300"
+
     wandb.init(
         project=project_name,
         config=config,
