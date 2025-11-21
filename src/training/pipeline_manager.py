@@ -1,4 +1,5 @@
 # src/training/pipeline_manager.py
+
 import os
 import yaml
 import pandas as pd
@@ -33,10 +34,12 @@ def set_seed(seed=42):
 # ------------------------------------------------------------
 def create_run_folder(base_dir):
     os.makedirs(base_dir, exist_ok=True)
+
     existing = [
         d for d in os.listdir(base_dir)
         if d.startswith("run_") and os.path.isdir(os.path.join(base_dir, d))
     ]
+
     nums = []
     for name in existing:
         try:
@@ -45,9 +48,9 @@ def create_run_folder(base_dir):
             pass
 
     next_num = max(nums) + 1 if nums else 1
-    run_path = os.path.join(base_dir, f"run_{next_num:03d}")
-    os.makedirs(run_path)
-    return run_path
+    path = os.path.join(base_dir, f"run_{next_num:03d}")
+    os.makedirs(path)
+    return path
 
 
 # ------------------------------------------------------------
@@ -55,7 +58,7 @@ def create_run_folder(base_dir):
 # ------------------------------------------------------------
 def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini-project"):
 
-    # Load YAML configs
+    # Load config files
     cfg_paths = yaml.safe_load(open("configs/dataset_paths.yaml"))
     cfg_model = yaml.safe_load(open(model_config_path))
     cfg = {**cfg_paths, **cfg_model}
@@ -69,13 +72,16 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     df = pd.read_csv(cfg["metadata_csv"])
     print("Loaded metadata rows:", len(df))
 
-    # Balanced subset selection
-    if "subset_size" in cfg and cfg["subset_size"] is not None:
+    # --------------------------------------------------------
+    # Subset selection
+    # --------------------------------------------------------
+    if cfg.get("subset_size") is not None:
         subset_size = cfg["subset_size"]
         total = len(df)
 
         if subset_size < total:
             print(f"Selecting balanced subset of size {subset_size}…")
+
             label_cols = [c for c in df.columns if c.startswith("label_")]
             y_full = df[label_cols].values
 
@@ -88,11 +94,13 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
 
             subset_idx, _ = next(splitter.split(df, y_full))
             df = df.iloc[subset_idx].reset_index(drop=True)
-            print(f"Subset selected: {len(df)} samples.")
+            print(f"Subset selected: {len(df)}")
         else:
-            print("Subset size >= dataset -> skipping subset selection.")
+            print("Subset size >= dataset, skipping subset selection.")
 
-    # Train/valid split
+    # --------------------------------------------------------
+    # Train/Valid split
+    # --------------------------------------------------------
     label_cols = [c for c in df.columns if c.startswith("label_")]
     y = df[label_cols].values
 
@@ -109,14 +117,16 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     print("TRAIN size:", len(train_df))
     print("VALID size:", len(valid_df))
 
+    # --------------------------------------------------------
     # SpecAugment
+    # --------------------------------------------------------
     if cfg.get("use_specaugment", False):
         print(">>> SpecAugment ENABLED")
         sa = SpecAugment(
             freq_masks=cfg["specaugment"].get("freq_masks", 2),
             time_masks=cfg["specaugment"].get("time_masks", 2),
             freq_max_width=cfg["specaugment"].get("freq_max_width", 20),
-            time_max_width=cfg["specaugment"].get("time_max_width", 50)
+            time_max_width=cfg["specaugment"].get("time_max_width", 50),
         )
     else:
         print(">>> SpecAugment DISABLED")
@@ -125,7 +135,9 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     train_ds = FMAAudioDataset(train_df, transform=sa)
     valid_ds = FMAAudioDataset(valid_df, transform=None)
 
+    # --------------------------------------------------------
     # Dataloaders
+    # --------------------------------------------------------
     train_loader = DataLoader(
         train_ds,
         batch_size=cfg["batch_size"],
@@ -142,7 +154,9 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
         pin_memory=True
     )
 
+    # --------------------------------------------------------
     # Model
+    # --------------------------------------------------------
     num_classes = len(label_cols)
     model = model_class(num_classes=num_classes)
 
@@ -150,7 +164,9 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Training on:", device)
 
+    # --------------------------------------------------------
     # W&B
+    # --------------------------------------------------------
     init_wandb(config=cfg, project_name=project_name)
     wandb.define_metric("epoch")
     wandb.define_metric("loss/*", step_metric="epoch")
@@ -160,7 +176,9 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     print("Saving logs to:", run_folder)
     yaml.safe_dump(cfg, open(os.path.join(run_folder, "config_used.yaml"), "w"))
 
+    # --------------------------------------------------------
     # Training
+    # --------------------------------------------------------
     train_model(
         model=model,
         train_loader=train_loader,
@@ -170,7 +188,7 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
         lr=cfg["lr"],
         weight_decay=cfg.get("weight_decay", 0.0),
         run_folder=run_folder,
-        cfg=cfg
+        cfg=cfg        # <-- IMPORTANT! Pass full config
     )
 
     print("Training complete.")
