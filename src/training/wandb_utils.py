@@ -47,8 +47,14 @@ def recall_at_k(y_true, y_probs, k=3):
 # W&B basic logging
 # ---------------------------------------------------------
 def init_wandb(config: dict, project_name: str = "nlp-mini-project"):
+    # Increase W&B network timeouts to avoid crashing on slow uploads
+    wandb.setup().settings.update({
+        "timeout_seconds": 300,     # was 20 by default
+    })
+
     wandb.init(project=project_name, config=config)
     return wandb.config
+
 
 
 def log_metrics(metrics: dict):
@@ -121,20 +127,29 @@ def log_precision_recall(y_true, y_probs, class_names):
 
     for i in range(num_classes):
         if y_true[:, i].sum() == 0:
-            continue  # skip empty class
+            continue
 
         prec, rec, _ = precision_recall_curve(y_true[:, i], y_probs[:, i])
 
-        table = wandb.Table(columns=["recall", "precision"])
-        for r, p in zip(rec, prec):
-            table.add_data(r, p)
+        # Skip very large curves to avoid heavy W&B uploads
+        if len(prec) > 2000:
+            print(f"[WARN] PR curve for {class_names[i]} skipped (too many points: {len(prec)})")
+            continue
 
-        wandb.log({
-            f"pr/{class_names[i]}": wandb.plot.line(
-                table, "recall", "precision",
-                title=f"PR: {class_names[i]}"
-            )
-        })
+        try:
+            table = wandb.Table(columns=["recall", "precision"])
+            for r, p in zip(rec, prec):
+                table.add_data(r, p)
+
+            wandb.log({
+                f"pr/{class_names[i]}": wandb.plot.line(
+                    table, "recall", "precision",
+                    title=f"PR: {class_names[i]}"
+                )
+            })
+        except Exception as e:
+            print(f"[WARN] WANDB PR logging failed for {class_names[i]}: {e}")
+
 
 
 # ---------------------------------------------------------

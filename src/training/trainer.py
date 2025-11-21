@@ -205,15 +205,26 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_de
         for i, ap in enumerate(per_class_ap):
             log_dict[f"AP/{CLASS_NAMES[i]}"] = ap
 
-        wandb.log(log_dict)
+        try:
+            wandb.log(log_dict)
+        except Exception as e:
+            print(f"[WARN] WANDB log failed: {e}")
+
 
         # =====================================================
         # VISUALIZATIONS
         # =====================================================
-        log_confusion_heatmap(all_targets, all_preds, CLASS_NAMES)
-        log_error_heatmap(all_targets, all_preds, CLASS_NAMES)
-        log_precision_recall(all_targets, all_probs, CLASS_NAMES)
-        log_binary_confusion_matrices(all_targets, all_preds, CLASS_NAMES)
+        VIS_EVERY = 5   # log every 5 epochs (or set 10)
+
+        if (epoch % VIS_EVERY == 0) or (epoch == epochs - 1):
+            try:
+                log_confusion_heatmap(all_targets, all_preds, CLASS_NAMES)
+                log_error_heatmap(all_targets, all_preds, CLASS_NAMES)
+                log_precision_recall(all_targets, all_probs, CLASS_NAMES)
+                log_binary_confusion_matrices(all_targets, all_preds, CLASS_NAMES)
+            except Exception as e:
+                print(f"[WARN] WANDB visualization failed: {e}")
+
 
         # Save misclassified samples
         csv_path = os.path.join(run_folder, f"misclassified_epoch_{epoch}.csv")
