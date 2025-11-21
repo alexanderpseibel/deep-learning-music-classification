@@ -35,19 +35,21 @@ class FMAAudioDataset(Dataset):
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
 
-        # Load mel spectrogram
-        mel = np.load(row["mel_path"])
+        # ----- Load mel spectrogram -----
+        mel = np.load(row["mel_path"])          # numpy array (128, T)
         mel = self._fix_length(mel)
-        mel = torch.tensor(mel, dtype=torch.float32).unsqueeze(0)  # (1,128,T)
 
-        # Load multi-hot labels
+        # ----- Apply SpecAugment BEFORE converting to torch -----
+        if self.transform:
+            mel = self.transform(mel)           # still numpy
+
+        # Convert to PyTorch after transforms
+        mel = torch.tensor(mel, dtype=torch.float32).unsqueeze(0)  # (1, 128, T)
+
+        # ----- Load multi-hot labels -----
         labels = torch.tensor(
             row[self.label_cols].values.astype(np.float32)
         )
 
-        # Apply transforms if any
-        if self.transform:
-            mel = self.transform(mel)
-
-        # Return ONLY mel + labels
         return mel, labels
+
