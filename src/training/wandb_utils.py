@@ -47,18 +47,15 @@ def recall_at_k(y_true, y_probs, k=3):
 # W&B basic logging
 # ---------------------------------------------------------
 def init_wandb(config: dict, project_name: str = "nlp-mini-project"):
-    # Increase W&B network timeouts to avoid crashing on slow uploads
-    wandb.setup().settings.update({
-        "timeout_seconds": 300,     # was 20 by default
-    })
-
-    wandb.init(project=project_name, config=config)
+    wandb.init(
+        project=project_name,
+        config=config,
+        # Increase W&B timeouts to avoid ReadTimeout crashes
+        settings=wandb.Settings(
+            _service_timeout=300
+        )
+    )
     return wandb.config
-
-
-
-def log_metrics(metrics: dict):
-    wandb.log(metrics)
 
 
 # ---------------------------------------------------------
