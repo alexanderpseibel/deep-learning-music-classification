@@ -10,8 +10,10 @@ num_workers: 16
 # Optimizer + Scheduler
 optimizer: "adamw"
 scheduler: "onecycle"
-max_lr: 0.001
+max_lr: 0.0005
+final_lr: 0.00001
 pct_start: 0.3
+
 
 # Disable SpecAugment
 use_specaugment: false

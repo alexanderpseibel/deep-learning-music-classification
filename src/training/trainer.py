@@ -15,7 +15,6 @@ import wandb
 from src.training.wandb_utils import (
     compute_map_and_per_class_ap,
     recall_at_k,
-    log_metrics,
     log_confusion_heatmap,
     log_error_heatmap,
     log_precision_recall,
@@ -44,7 +43,7 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_de
     if opt_name == "adamw":
         optimizer = torch.optim.AdamW(
             model.parameters(),
-            lr=lr,
+            lr=cfg.get("max_lr", lr),
             weight_decay=weight_decay
         )
         print(">>> Using AdamW optimizer")
@@ -63,17 +62,22 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_de
 
     if scheduler_name == "onecycle":
         max_lr = cfg.get("max_lr", lr * 10)
+        final_lr = cfg.get("final_lr", max_lr / 25)
         pct_start = cfg.get("pct_start", 0.3)
+
+        final_div_factor = max_lr / final_lr
 
         scheduler = torch.optim.lr_scheduler.OneCycleLR(
             optimizer,
             max_lr=max_lr,
-            steps_per_epoch=len(train_loader),
             epochs=epochs,
+            steps_per_epoch=len(train_loader),
             pct_start=pct_start,
-            anneal_strategy="cos"
+            anneal_strategy="cos",
+            final_div_factor=final_div_factor
         )
-        print(f">>> Using OneCycleLR (max_lr={max_lr}, pct_start={pct_start})")
+
+        print(f">>> Using OneCycleLR (max_lr={max_lr}, final_lr={final_lr}, pct_start={pct_start})")
 
     else:
         scheduler = None
@@ -92,8 +96,8 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_de
 
         for mel, labels in train_loader:
             mel, labels = mel.to(device), labels.to(device)
-            optimizer.zero_grad()
 
+            optimizer.zero_grad()
             logits = model(mel)
             loss = criterion(logits, labels)
             loss.backward()
@@ -107,7 +111,7 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_de
         avg_train_loss = total_loss / len(train_loader)
 
         # =====================================================
-        # VALID
+        # VALIDATION
         # =====================================================
         model.eval()
         val_loss = 0
@@ -129,6 +133,7 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_de
                 all_probs.append(probs)
                 all_preds.append(preds)
 
+                # Misclassified tracking
                 batch_df = valid_loader.dataset.df.iloc[
                     batch_idx * valid_loader.batch_size:
                     batch_idx * valid_loader.batch_size + len(labels)
@@ -145,10 +150,10 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_de
                             preds[i].tolist()
                         ])
 
-        # stack arrays
+        # Stack arrays
         all_targets = np.vstack(all_targets)
-        all_preds = np.vstack(all_preds)
         all_probs = np.vstack(all_probs)
+        all_preds = np.vstack(all_preds)
         avg_val_loss = val_loss / len(valid_loader)
 
         # =====================================================
@@ -194,16 +199,16 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_de
             "recall@3": r3
         }
 
+        # Per-class metrics
         for i, v in enumerate(per_class_f1):
             log_dict[f"f1/{CLASS_NAMES[i]}"] = v
-
         for i, ap in enumerate(per_class_ap):
             log_dict[f"AP/{CLASS_NAMES[i]}"] = ap
 
         wandb.log(log_dict)
 
         # =====================================================
-        # Diagnostic visualizations
+        # VISUALIZATIONS
         # =====================================================
         log_confusion_heatmap(all_targets, all_preds, CLASS_NAMES)
         log_error_heatmap(all_targets, all_preds, CLASS_NAMES)
