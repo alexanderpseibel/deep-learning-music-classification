@@ -7,10 +7,11 @@ weight_decay: 0.0001
 batch_size: 32
 num_workers: 16
 
-# Augmentation settings
-use_specaugment: true
-specaugment:
-  freq_masks: 2
-  time_masks: 2
-  freq_max_width: 20
-  time_max_width: 50
+# Optimizer + Scheduler
+optimizer: "adamw"
+scheduler: "onecycle"
+max_lr: 0.001
+pct_start: 0.3
+
+# Disable SpecAugment
+use_specaugment: false

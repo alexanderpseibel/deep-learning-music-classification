@@ -10,13 +10,13 @@ from iterstrat.ml_stratifiers import MultilabelStratifiedShuffleSplit
 import random
 
 from src.data.fma_dataset import FMAAudioDataset
-from src.data.transforms import SpecAugment      # ← NEW IMPORT
+from src.data.transforms import SpecAugment
 from src.training.wandb_utils import init_wandb
 from src.training.trainer import train_model
 
 
 # ------------------------------------------------------------
-# Set global seed
+# Seed
 # ------------------------------------------------------------
 def set_seed(seed=42):
     random.seed(seed)
@@ -29,16 +29,14 @@ def set_seed(seed=42):
 
 
 # ------------------------------------------------------------
-# Create run folder
+# Create run/XXX folder
 # ------------------------------------------------------------
 def create_run_folder(base_dir):
     os.makedirs(base_dir, exist_ok=True)
-
     existing = [
         d for d in os.listdir(base_dir)
         if d.startswith("run_") and os.path.isdir(os.path.join(base_dir, d))
     ]
-
     nums = []
     for name in existing:
         try:
@@ -47,76 +45,61 @@ def create_run_folder(base_dir):
             pass
 
     next_num = max(nums) + 1 if nums else 1
-    folder_name = f"run_{next_num:03d}"
-
-    run_path = os.path.join(base_dir, folder_name)
+    run_path = os.path.join(base_dir, f"run_{next_num:03d}")
     os.makedirs(run_path)
-
     return run_path
 
 
 # ------------------------------------------------------------
-# General training pipeline
+# MAIN PIPELINE
 # ------------------------------------------------------------
 def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini-project"):
 
-    # --------------------------------------------------------
-    # Load YAML config
-    # --------------------------------------------------------
+    # Load YAML configs
     cfg_paths = yaml.safe_load(open("configs/dataset_paths.yaml"))
     cfg_model = yaml.safe_load(open(model_config_path))
     cfg = {**cfg_paths, **cfg_model}
 
-    # --------------------------------------------------------
     # Seed
-    # --------------------------------------------------------
     seed = cfg.get("seed", 42)
     set_seed(seed)
     print(f"Seed set to {seed}")
 
-    # --------------------------------------------------------
     # Load metadata
-    # --------------------------------------------------------
     df = pd.read_csv(cfg["metadata_csv"])
     print("Loaded metadata rows:", len(df))
 
-    # --------------------------------------------------------
     # Balanced subset selection
-    # --------------------------------------------------------
     if "subset_size" in cfg and cfg["subset_size"] is not None:
         subset_size = cfg["subset_size"]
-        total_samples = len(df)
+        total = len(df)
 
-        if subset_size >= total_samples:
-            print(f"subset_size == dataset size ({total_samples}). Skipping subset selection.")
-        else:
-            print(f"Selecting balanced subset of size {subset_size}...")
-
+        if subset_size < total:
+            print(f"Selecting balanced subset of size {subset_size}…")
             label_cols = [c for c in df.columns if c.startswith("label_")]
             y_full = df[label_cols].values
 
             splitter = MultilabelStratifiedShuffleSplit(
                 n_splits=1,
-                train_size=subset_size / total_samples,
-                test_size=1 - subset_size / total_samples,
-                random_state=seed,
+                train_size=subset_size / total,
+                test_size=1 - subset_size / total,
+                random_state=seed
             )
 
             subset_idx, _ = next(splitter.split(df, y_full))
             df = df.iloc[subset_idx].reset_index(drop=True)
+            print(f"Subset selected: {len(df)} samples.")
+        else:
+            print("Subset size >= dataset -> skipping subset selection.")
 
-            print(f"Balanced subset selected: {len(df)} samples.")
-
-    # --------------------------------------------------------
     # Train/valid split
-    # --------------------------------------------------------
     label_cols = [c for c in df.columns if c.startswith("label_")]
     y = df[label_cols].values
 
     splitter = MultilabelStratifiedShuffleSplit(
         n_splits=1,
         test_size=0.1,
-        random_state=seed,
+        random_state=seed
     )
 
     train_idx, valid_idx = next(splitter.split(df, y))
@@ -126,31 +109,23 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     print("TRAIN size:", len(train_df))
     print("VALID size:", len(valid_df))
 
-
-    # --------------------------------------------------------
-    # Datasets (SpecAugment controlled by config)
-    # --------------------------------------------------------
-
+    # SpecAugment
     if cfg.get("use_specaugment", False):
         print(">>> SpecAugment ENABLED")
-
-        specaug = SpecAugment(
+        sa = SpecAugment(
             freq_masks=cfg["specaugment"].get("freq_masks", 2),
             time_masks=cfg["specaugment"].get("time_masks", 2),
             freq_max_width=cfg["specaugment"].get("freq_max_width", 20),
-            time_max_width=cfg["specaugment"].get("time_max_width", 50),
+            time_max_width=cfg["specaugment"].get("time_max_width", 50)
         )
     else:
         print(">>> SpecAugment DISABLED")
-        specaug = None
+        sa = None
 
-    train_ds = FMAAudioDataset(train_df, transform=specaug)
+    train_ds = FMAAudioDataset(train_df, transform=sa)
     valid_ds = FMAAudioDataset(valid_df, transform=None)
 
-
-    # --------------------------------------------------------
-    # DataLoaders
-    # --------------------------------------------------------
+    # Dataloaders
     train_loader = DataLoader(
         train_ds,
         batch_size=cfg["batch_size"],
@@ -167,39 +142,25 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
         pin_memory=True
     )
 
-    # --------------------------------------------------------
     # Model
-    # --------------------------------------------------------
-    num_classes = len([c for c in df.columns if c.startswith("label_")])
+    num_classes = len(label_cols)
     model = model_class(num_classes=num_classes)
 
-    # --------------------------------------------------------
     # Device
-    # --------------------------------------------------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Training on:", device)
 
-    # --------------------------------------------------------
-    # W&B Init
-    # --------------------------------------------------------
-    run_config = init_wandb(config=cfg, project_name=project_name)
-    print("W&B run initialized.")
-
+    # W&B
+    init_wandb(config=cfg, project_name=project_name)
     wandb.define_metric("epoch")
     wandb.define_metric("loss/*", step_metric="epoch")
 
-    # --------------------------------------------------------
     # Run folder
-    # --------------------------------------------------------
-    log_root = cfg["misclassified_examples"]
-    run_folder = create_run_folder(log_root)
+    run_folder = create_run_folder(cfg["misclassified_examples"])
     print("Saving logs to:", run_folder)
-
     yaml.safe_dump(cfg, open(os.path.join(run_folder, "config_used.yaml"), "w"))
 
-    # --------------------------------------------------------
     # Training
-    # --------------------------------------------------------
     train_model(
         model=model,
         train_loader=train_loader,
@@ -208,7 +169,8 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
         epochs=cfg["epochs"],
         lr=cfg["lr"],
         weight_decay=cfg.get("weight_decay", 0.0),
-        run_folder=run_folder
+        run_folder=run_folder,
+        cfg=cfg
     )
 
     print("Training complete.")

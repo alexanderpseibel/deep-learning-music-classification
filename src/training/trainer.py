@@ -6,7 +6,6 @@ import csv
 
 from sklearn.metrics import (
     f1_score,
-    average_precision_score,
     roc_auc_score,
     label_ranking_loss
 )
@@ -14,6 +13,8 @@ from sklearn.metrics import (
 import wandb
 
 from src.training.wandb_utils import (
+    compute_map_and_per_class_ap,
+    recall_at_k,
     log_metrics,
     log_confusion_heatmap,
     log_error_heatmap,
@@ -28,56 +29,63 @@ CLASS_NAMES = [
 
 
 # ---------------------------------------------------------
-# Compute mAP and AP per class
-# ---------------------------------------------------------
-def compute_map_and_per_class_ap(y_true, y_pred_probs):
-    per_class_ap = []
-
-    for i in range(y_true.shape[1]):
-        try:
-            ap = average_precision_score(y_true[:, i], y_pred_probs[:, i])
-        except ValueError:
-            ap = np.nan
-        per_class_ap.append(ap)
-
-    mAP = float(np.nanmean(per_class_ap))
-    return mAP, per_class_ap
-
-
-# ---------------------------------------------------------
-# Recall@K
-# ---------------------------------------------------------
-def recall_at_k(y_true, y_probs, k=3):
-    topk_idx = np.argsort(-y_probs, axis=1)[:, :k]
-
-    recalls = []
-    for true_row, topk in zip(y_true, topk_idx):
-        true_labels = np.where(true_row == 1)[0]
-        if len(true_labels) == 0:
-            continue
-        hits = sum(t in topk for t in true_labels)
-        recalls.append(hits / len(true_labels))
-
-    return float(np.mean(recalls)) if recalls else 0.0
-
-
-# ---------------------------------------------------------
 # TRAINING LOOP
 # ---------------------------------------------------------
-def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_decay, run_folder):
+def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_decay, run_folder, cfg):
 
     model = model.to(device)
-    optimizer = torch.optim.Adam(
-        model.parameters(),
-        lr=lr,
-        weight_decay=weight_decay
-    )
     criterion = torch.nn.BCEWithLogitsLoss()
 
+    # -----------------------------------------
+    # Optimizer
+    # -----------------------------------------
+    opt_name = cfg.get("optimizer", "adam").lower()
+
+    if opt_name == "adamw":
+        optimizer = torch.optim.AdamW(
+            model.parameters(),
+            lr=lr,
+            weight_decay=weight_decay
+        )
+        print(">>> Using AdamW optimizer")
+    else:
+        optimizer = torch.optim.Adam(
+            model.parameters(),
+            lr=lr,
+            weight_decay=weight_decay
+        )
+        print(">>> Using Adam optimizer")
+
+    # -----------------------------------------
+    # Scheduler
+    # -----------------------------------------
+    scheduler_name = cfg.get("scheduler", "none").lower()
+
+    if scheduler_name == "onecycle":
+        max_lr = cfg.get("max_lr", lr * 10)
+        pct_start = cfg.get("pct_start", 0.3)
+
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer,
+            max_lr=max_lr,
+            steps_per_epoch=len(train_loader),
+            epochs=epochs,
+            pct_start=pct_start,
+            anneal_strategy="cos"
+        )
+        print(f">>> Using OneCycleLR (max_lr={max_lr}, pct_start={pct_start})")
+
+    else:
+        scheduler = None
+        print(">>> No LR scheduler")
+
+    # ---------------------------------------------------------
+    # MAIN TRAINING LOOP
+    # ---------------------------------------------------------
     for epoch in range(epochs):
 
         # =====================================================
-        #                     TRAIN
+        # TRAIN
         # =====================================================
         model.train()
         total_loss = 0
@@ -85,16 +93,21 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_de
         for mel, labels in train_loader:
             mel, labels = mel.to(device), labels.to(device)
             optimizer.zero_grad()
+
             logits = model(mel)
             loss = criterion(logits, labels)
             loss.backward()
             optimizer.step()
+
+            if scheduler is not None:
+                scheduler.step()
+
             total_loss += loss.item()
 
         avg_train_loss = total_loss / len(train_loader)
 
         # =====================================================
-        #                     VALID
+        # VALID
         # =====================================================
         model.eval()
         val_loss = 0
@@ -116,7 +129,6 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_de
                 all_probs.append(probs)
                 all_preds.append(preds)
 
-                # Misclassified items
                 batch_df = valid_loader.dataset.df.iloc[
                     batch_idx * valid_loader.batch_size:
                     batch_idx * valid_loader.batch_size + len(labels)
@@ -140,7 +152,7 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_de
         avg_val_loss = val_loss / len(valid_loader)
 
         # =====================================================
-        #                METRICS (multilabel)
+        # METRICS
         # =====================================================
         f1_micro = f1_score(all_targets, all_preds, average="micro")
         f1_macro = f1_score(all_targets, all_preds, average="macro")
@@ -150,12 +162,12 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_de
 
         try:
             auc_macro = roc_auc_score(all_targets, all_probs, average="macro")
-        except ValueError:
+        except:
             auc_macro = 0.0
 
         try:
             auc_micro = roc_auc_score(all_targets, all_probs, average="micro")
-        except ValueError:
+        except:
             auc_micro = 0.0
 
         lrl = label_ranking_loss(all_targets, all_probs)
@@ -167,7 +179,7 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_de
         )
 
         # =====================================================
-        #                  W&B LOGGING
+        # W&B LOGGING
         # =====================================================
         log_dict = {
             "epoch": epoch,
@@ -182,31 +194,27 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_de
             "recall@3": r3
         }
 
-        # per-class f1 + AP
         for i, v in enumerate(per_class_f1):
             log_dict[f"f1/{CLASS_NAMES[i]}"] = v
 
         for i, ap in enumerate(per_class_ap):
             log_dict[f"AP/{CLASS_NAMES[i]}"] = ap
 
-        # Single log call
         wandb.log(log_dict)
 
         # =====================================================
-        # Diagnostic visualizations (NO step argument!)
+        # Diagnostic visualizations
         # =====================================================
         log_confusion_heatmap(all_targets, all_preds, CLASS_NAMES)
         log_error_heatmap(all_targets, all_preds, CLASS_NAMES)
         log_precision_recall(all_targets, all_probs, CLASS_NAMES)
         log_binary_confusion_matrices(all_targets, all_preds, CLASS_NAMES)
 
-        # Save misclassified examples
+        # Save misclassified samples
         csv_path = os.path.join(run_folder, f"misclassified_epoch_{epoch}.csv")
         with open(csv_path, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["track_id", "audio_path", "mel_path", "true_labels", "pred_labels"])
             writer.writerows(misclassified_rows)
-
-        print("Saved misclassified CSV:", csv_path)
 
     return model
