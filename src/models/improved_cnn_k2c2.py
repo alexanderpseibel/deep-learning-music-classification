@@ -32,6 +32,8 @@ class ImprovedK2C2CNN(nn.Module):
                 nn.BatchNorm2d(out_ch),
                 nn.ELU(),
 
+                nn.Dropout2d(0.2),
+
                 nn.MaxPool2d(pool_kernel)
             )
 

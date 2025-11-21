@@ -1,4 +1,5 @@
 model: "SimpleCNN"
+seed: 42
 subset_size: 300
 epochs: 3
 lr: 0.001

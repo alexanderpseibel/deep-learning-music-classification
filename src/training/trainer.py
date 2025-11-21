@@ -64,10 +64,14 @@ def recall_at_k(y_true, y_probs, k=3):
 # ---------------------------------------------------------
 # TRAINING LOOP
 # ---------------------------------------------------------
-def train_model(model, train_loader, valid_loader, device, epochs, lr, run_folder):
+def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_decay, run_folder):
 
     model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(
+        model.parameters(),
+        lr=lr,
+        weight_decay=weight_decay
+    )
     criterion = torch.nn.BCEWithLogitsLoss()
 
     for epoch in range(epochs):

@@ -1,14 +1,30 @@
 import os
 import yaml
 import pandas as pd
+import numpy as np
 import torch
 import wandb
 from torch.utils.data import DataLoader
 from iterstrat.ml_stratifiers import MultilabelStratifiedShuffleSplit
+import random
 
 from src.data.fma_dataset import FMAAudioDataset
 from src.training.wandb_utils import init_wandb
 from src.training.trainer import train_model
+
+
+# ------------------------------------------------------------
+# Set global seed (must be defined BEFORE use)
+# ------------------------------------------------------------
+def set_seed(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    # For deterministic training
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 # ------------------------------------------------------------
@@ -51,6 +67,13 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     cfg = {**cfg_paths, **cfg_model}
 
     # --------------------------------------------------------
+    # Set seed for reproducibility
+    # --------------------------------------------------------
+    seed = cfg.get("seed", 42)
+    set_seed(seed)
+    print(f"Seed set to {seed}")
+
+    # --------------------------------------------------------
     # Load metadata
     # --------------------------------------------------------
     df = pd.read_csv(cfg["metadata_csv"])
@@ -73,7 +96,7 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
             n_splits=1,
             train_size=train_fraction,
             test_size=1 - train_fraction,
-            random_state=42
+            random_state=seed,
         )
 
         subset_idx, _ = next(splitter.split(df, y_full))
@@ -90,12 +113,12 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     splitter = MultilabelStratifiedShuffleSplit(
         n_splits=1,
         test_size=0.1,
-        random_state=42
+        random_state=seed,
     )
 
-    for train_idx, valid_idx in splitter.split(df, y):
-        train_df = df.iloc[train_idx].reset_index(drop=True)
-        valid_df = df.iloc[valid_idx].reset_index(drop=True)
+    train_idx, valid_idx = next(splitter.split(df, y))
+    train_df = df.iloc[train_idx].reset_index(drop=True)
+    valid_df = df.iloc[valid_idx].reset_index(drop=True)
 
     print("TRAIN size:", len(train_df))
     print("VALID size:", len(valid_df))
@@ -142,10 +165,9 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     run_config = init_wandb(config=cfg, project_name=project_name)
     print("W&B run initialized.")
 
-    # Tell W&B to use epoch as x-axis for all loss/* metrics
+    # Use epoch as x-axis in W&B
     wandb.define_metric("epoch")
     wandb.define_metric("loss/*", step_metric="epoch")
-
 
     # --------------------------------------------------------
     # Create run folder
@@ -166,7 +188,9 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
         device=device,
         epochs=cfg["epochs"],
         lr=cfg["lr"],
+        weight_decay=cfg.get("weight_decay", 0.0),
         run_folder=run_folder
     )
+
 
     print("Training complete.")
