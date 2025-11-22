@@ -30,15 +30,15 @@ class ImprovedK2C2CNN(nn.Module):
                 nn.BatchNorm2d(out_ch),
                 nn.GELU(),
 
-                nn.Dropout2d(0.2),
+                nn.Dropout2d(0.3),
             )
 
         # Use same downsampling schedule as original K2C2
-        self.block1 = conv_block(1,   32, (2, 4))
-        self.block2 = conv_block(32,  64, (2, 4))
-        self.block3 = conv_block(64, 128, (2, 4))
-        self.block4 = conv_block(128, 256, (3, 5))
-        self.block5 = conv_block(256, 512, (4, 4))
+        self.block1 = conv_block(1,   32, (2, 3))
+        self.block2 = conv_block(32,  64, (2, 3))
+        self.block3 = conv_block(64, 128, (2, 3))
+        self.block4 = conv_block(128, 256, (2, 4))
+        self.block5 = conv_block(256, 512, (3, 3))
 
         # Global average pooling
         self.gap = nn.AdaptiveAvgPool2d((1, 1))

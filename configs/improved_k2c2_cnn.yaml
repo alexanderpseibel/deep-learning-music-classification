@@ -12,7 +12,7 @@ epochs: 20
 
 # Base LR (AdamW uses this before OneCycle takes over)
 lr: 0.0001
-weight_decay: 0.0001
+weight_decay: 0.0005
 
 batch_size: 32
 num_workers: 16
@@ -42,10 +42,11 @@ pct_start: 0.3
 #      Data Augmentation
 # ------------------------------
 
-use_specaugment: false
+use_specaugment: true
 
 specaugment:
-  freq_masks: 2
-  time_masks: 2
-  freq_max_width: 20
-  time_max_width: 50
+  freq_masks: 4
+  time_masks: 4
+  freq_max_width: 24
+  time_max_width: 80
+
