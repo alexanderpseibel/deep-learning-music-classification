@@ -50,6 +50,10 @@ build/
 .DS_Store
 Thumbs.db
 
+# Local Windows version of init script
+scripts/init_windows.sh
+
+
 # -----------------------------------------
 # VSCode
 # -----------------------------------------
