@@ -6,7 +6,7 @@ model: "ImprovedK2C2CNN"
 seed: 42
 
 # Use full dataset
-subset_size: 90086   # or remove this line entirely
+#subset_size: 90086   # or remove this line entirely
 
 epochs: 20
 
@@ -42,7 +42,7 @@ pct_start: 0.3
 #      Data Augmentation
 # ------------------------------
 
-use_specaugment: false
+use_specaugment: true
 
 # You may keep these defaults for future experiments
 specaugment:
