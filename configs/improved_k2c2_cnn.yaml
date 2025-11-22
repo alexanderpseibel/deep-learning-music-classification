@@ -6,7 +6,7 @@ model: "ImprovedK2C2CNN"
 seed: 42
 
 # Use full dataset
-subset_size: 20000     
+#subset_size: 20000     
 
 epochs: 20
 
