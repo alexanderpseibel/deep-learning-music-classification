@@ -181,3 +181,21 @@ def log_binary_confusion_matrices(y_true, y_pred, class_names):
         plt.tight_layout()
         wandb.log({f"confusion/{cls}": wandb.Image(fig)})
         plt.close(fig)
+
+
+# ---------------------------------------------------------
+# GRADIENT NORM LOGGING
+# ---------------------------------------------------------
+
+def log_gradients_norm(model):
+    """
+    Logs gradient norms for each parameter.
+    Very lightweight and safe to call every epoch.
+    """
+    grad_dict = {}
+    for name, param in model.named_parameters():
+        if param.grad is not None:
+            grad_dict[f"grad_norm/{name}"] = float(param.grad.norm().item())
+    
+    wandb.log(grad_dict)
+

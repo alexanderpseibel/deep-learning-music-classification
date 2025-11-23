@@ -101,6 +101,11 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_de
             logits = model(mel)
             loss = criterion(logits, labels)
             loss.backward()
+
+            #GRADIENT LOGGING
+            from src.training.wandb_utils import log_gradients_norm
+            log_gradients_norm(model)
+
             optimizer.step()
 
             if scheduler is not None:
