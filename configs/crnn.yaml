@@ -1,0 +1,56 @@
+# ------------------------------
+#      MODEL + TRAINING
+# ------------------------------
+
+model: "CRNNFMA"
+seed: 42
+
+# Train on full dataset (comment/uncomment as needed)
+# subset_size: 20000      # for testing
+# subset_size: 90086      # full dataset
+
+epochs: 20
+
+# Base LR before OneCycle takes over
+lr: 0.0001
+weight_decay: 0.0001
+
+batch_size: 32
+num_workers: 16
+
+# ------------------------------
+#      Optimizer
+# ------------------------------
+
+optimizer: "adamw"
+
+# ------------------------------
+#      LR Scheduler
+# ------------------------------
+
+scheduler: "onecycle"
+
+max_lr: 0.0005
+final_lr: 0.00001
+pct_start: 0.3
+
+# ------------------------------
+#      Data Augmentation
+# ------------------------------
+
+use_specaugment: true
+
+specaugment:
+  freq_masks: 2
+  time_masks: 2
+  freq_max_width: 24
+  time_max_width: 50
+
+# ------------------------------
+#      CRNN Settings
+# ------------------------------
+
+crnn:
+  rnn_hidden: 128
+  rnn_layers: 2
+  cnn_channels: [32, 64, 128, 256]
