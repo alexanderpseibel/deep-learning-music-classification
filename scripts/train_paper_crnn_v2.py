@@ -1,7 +1,7 @@
 import time
 from src.training.pipeline_manager import run_training_pipeline
-from src.models.paper_crnn_v2_uni import CRNNv2Uni
-from src.models.paper_crnn_v2_bi import CRNNv2Bi
+from src.models.paper_crnn_v2_uni import PaperCRNNv2Uni
+from src.models.paper_crnn_v2_bi import PaperCRNNv2Bi
 
 # --------------- CONFIG PATH ------------------
 CONFIG_PATH = "configs/paper_crnn_v2.yaml"
