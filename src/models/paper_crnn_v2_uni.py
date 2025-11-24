@@ -1,60 +1,66 @@
-#src/models/paper_crnn_uni.py
+# src/models/paper_crnn_v2_uni.py
+
 import torch
 import torch.nn as nn
 
 
-class CRNNv2Uni(nn.Module):
+class PaperCRNNv2Uni(nn.Module):
     """
-    Improved CRNN (unidirectional GRU)
-    - GELU instead of ELU
-    - Consistent (2×2) pooling schedule to keep more time resolution
-    - GRU(256) with dropout=0.3 to prevent overfitting
-    - Same output interface as your existing models
+    Paper-style CRNN (Choi et al., 2017), corrected for arbitrary mel bins.
+    Uses UNIDIRECTIONAL GRU.
     """
 
     def __init__(self, num_classes):
         super().__init__()
 
-        # --- CNN FRONTEND (4 conv blocks) ---
-        def conv_block(in_ch, out_ch):
+        # --- CNN FRONTEND (4 layers) ---
+        def conv_block(in_ch, out_ch, pool_kernel=(2, 2)):
             return nn.Sequential(
                 nn.Conv2d(in_ch, out_ch, 3, padding=1),
                 nn.BatchNorm2d(out_ch),
-                nn.GELU(),
-                nn.MaxPool2d((2, 2)),     # keep more time resolution
+                nn.ELU(),
+                nn.MaxPool2d(pool_kernel),
             )
 
-        self.conv1 = conv_block(1,   96)
-        self.conv2 = conv_block(96, 128)
-        self.conv3 = conv_block(128, 128)
-        self.conv4 = conv_block(128, 128)
+        self.conv1 = conv_block(1,   96, (2, 2))
+        self.conv2 = conv_block(96, 128, (2, 2))
+        self.conv3 = conv_block(128, 128, (2, 2))
+        self.conv4 = conv_block(128, 128, (2, 2))
 
-        # small spatial dropout
+        # Weak dropout between conv blocks (paper)
         self.drop = nn.Dropout(0.1)
 
-        # GRU backend
+        # --- SAFE FREQUENCY COLLAPSE ---
+        # Collapses (freq_dim) → 1 while keeping time dimension unchanged
+        self.freq_collapse = nn.AdaptiveAvgPool2d((1, None))
+
+        # --- RNN backend (UNIDIRECTIONAL) ---
         self.gru = nn.GRU(
-            input_size=128,    # after frequency collapse
+            input_size=128,      # matches C after conv frontend
             hidden_size=256,
             num_layers=2,
-            dropout=0.3,       # dropout inside GRU
             batch_first=True,
+            dropout=0.3,
             bidirectional=False
         )
 
         self.fc = nn.Linear(256, num_classes)
 
     def forward(self, x):
+        # CNN
         x = self.drop(self.conv1(x))
         x = self.drop(self.conv2(x))
         x = self.drop(self.conv3(x))
         x = self.drop(self.conv4(x))
 
-        # (B, C, F, T) → collapse freq dim
-        x = x.squeeze(2)         # (B, C, T)
-        x = x.transpose(1, 2)    # (B, T, C)
+        # Collapse frequency dim → (B, C, 1, T)
+        x = self.freq_collapse(x)
 
-        _, h_last = self.gru(x)
-        h_last = h_last[-1]      # final layer
+        # Reshape for GRU → (B, T, C)
+        x = x.squeeze(2).transpose(1, 2)
+
+        # GRU
+        _, h_last = self.gru(x)   # (num_layers, B, H)
+        h_last = h_last[-1]       # last layer
 
         return self.fc(h_last)
