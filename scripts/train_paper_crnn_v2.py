@@ -13,7 +13,7 @@ print("   Training CRNNv2Uni")
 print("===============================\n")
 
 run_training_pipeline(
-    model_class=CRNNv2Uni,
+    model_class=PaperCRNNv2Uni,
     model_config_path=CONFIG_PATH,
     project_name=PROJECT
 )
@@ -27,7 +27,7 @@ print("   Training CRNNv2Bi")
 print("===============================\n")
 
 run_training_pipeline(
-    model_class=CRNNv2Bi,
+    model_class=PaperCRNNv2Bi,
     model_config_path=CONFIG_PATH,
     project_name=PROJECT
 )
