@@ -132,8 +132,30 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
         print(">>> SpecAugment DISABLED")
         sa = None
 
-    train_ds = FMAAudioDataset(train_df, transform=sa)
-    valid_ds = FMAAudioDataset(valid_df, transform=None)
+    # --------------------------------------------------------
+    # Normalization
+    # --------------------------------------------------------
+    if cfg.get("use_normalization", False):
+        mean = cfg["mel_mean"]
+        std = cfg["mel_std"]
+        print(f">>> Normalization ENABLED (mean={mean}, std={std})")
+    else:
+        mean, std = None, None
+        print(">>> Normalization DISABLED")
+
+    train_ds = FMAAudioDataset(
+        train_df,
+        transform=sa,
+        mean=mean,
+        std=std
+    )
+
+    valid_ds = FMAAudioDataset(
+        valid_df,
+        transform=None,
+        mean=mean,
+        std=std
+    )
 
     # --------------------------------------------------------
     # Dataloaders
@@ -153,6 +175,7 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
         num_workers=cfg["num_workers"],
         pin_memory=True
     )
+
 
     # --------------------------------------------------------
     # Model

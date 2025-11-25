@@ -11,10 +11,14 @@ class FMAAudioDataset(Dataset):
 
     TARGET_T = 3000  # fixed mel width
 
-    def __init__(self, df, transform=None):
+    def __init__(self, df, transform=None, mean=None, std=None):
         self.df = df.reset_index(drop=True)
         self.transform = transform
         self.label_cols = [c for c in df.columns if c.startswith("label_")]
+
+        # --- Normalization parameters ---
+        self.mean = mean
+        self.std = std
 
     def __len__(self):
         return len(self.df)
@@ -43,7 +47,11 @@ class FMAAudioDataset(Dataset):
         if self.transform:
             mel = self.transform(mel)           # still numpy
 
-        # Convert to PyTorch after transforms
+        # ----- Normalization (after SpecAugment, before tensor) -----
+        if self.mean is not None and self.std is not None:
+            mel = (mel - self.mean) / self.std
+
+        # Convert to PyTorch after transforms + normalization
         mel = torch.tensor(mel, dtype=torch.float32).unsqueeze(0)  # (1, 128, T)
 
         # ----- Load multi-hot labels -----
@@ -52,4 +60,3 @@ class FMAAudioDataset(Dataset):
         )
 
         return mel, labels
-
