@@ -42,7 +42,7 @@ pct_start: 0.3
 #      Data Augmentation
 # ------------------------------
 
-use_specaugment: true
+use_specaugment: false
 
 # You may keep these defaults for future experiments
 specaugment:
