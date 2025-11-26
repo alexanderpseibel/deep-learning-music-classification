@@ -102,12 +102,16 @@ def log_interpretability_images(model, samples, device):
         sg  = smoothgrad(model, mel, class_idx)
 
         fig, ax = plt.subplots(1, 3, figsize=(12, 4))
-        ax[0].imshow(mel[0, 0].cpu(), aspect="auto", origin="lower")
+
+        # Mel spectrogram
+        ax[0].imshow(mel[0, 0].detach().cpu().numpy(), aspect="auto", origin="lower")
         ax[0].set_title(f"Mel {sample['track_id']}")
 
+        # Grad-CAM
         ax[1].imshow(cam, aspect="auto", origin="lower", cmap="magma")
         ax[1].set_title("Grad-CAM")
 
+        # SmoothGrad
         ax[2].imshow(sg, aspect="auto", origin="lower", cmap="inferno")
         ax[2].set_title("SmoothGrad")
 
