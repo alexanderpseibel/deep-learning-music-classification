@@ -1,5 +1,5 @@
-#configs/improved_k2c2.yaml
 experiment_name: "improved k2c2"
+
 model:
   type: "GenericCNN"
   channels: [32, 64, 128, 256, 512]
@@ -9,11 +9,14 @@ model:
   activation: "elu"
 
 epochs: 20
+
+# ------------------------------
+# Optimization
+# ------------------------------
 lr: 0.0001
 max_lr: 0.0005
 final_lr: 0.00001
 pct_start: 0.3
-
 weight_decay: 0.0001
 
 batch_size: 32
@@ -21,8 +24,24 @@ num_workers: 16
 
 optimizer: "adamw"
 scheduler: "onecycle"
+
 use_normalization: false
 
-#Total ≈ 3.13 million params
+# ------------------------------
+# Interpretability (Grad-CAM + SmoothGrad)
+# ------------------------------
+interpretability:
+  enabled: true
+  log_every: 5    # Generate visualizations every N epochs
+  samples:
+    - track_id: 9793
+      label: 13          # SoulRnB (0-indexed!)
+      path: "/work/NLP-mini-project/datasets/fma/fma_clean/mels/009/009793.npy"
 
+    - track_id: 110757
+      label: 5           # HipHop (0-indexed!)
+      path: "/work/NLP-mini-project/datasets/fma/fma_clean/mels/110/110757.npy"
 
+    - track_id: 123844
+      label: 0           # Rock (0-indexed!)
+      path: "/work/NLP-mini-project/datasets/fma/fma_clean/mels/123/123844.npy"

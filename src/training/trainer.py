@@ -102,10 +102,6 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_de
             loss = criterion(logits, labels)
             loss.backward()
 
-            #GRADIENT LOGGING
-            from src.training.wandb_utils import log_gradients_norm
-            log_gradients_norm(model)
-
             optimizer.step()
 
             if scheduler is not None:
@@ -215,12 +211,23 @@ def train_model(model, train_loader, valid_loader, device, epochs, lr, weight_de
         except Exception as e:
             print(f"[WARN] WANDB log failed: {e}")
 
+        # ---------------------------------------------------------
+        # INTERPRETABILITY LOGGING (Grad-CAM + SmoothGrad)
+        # ---------------------------------------------------------
+        if cfg.get("interpretability", {}).get("enabled", False):
+            every = cfg["interpretability"].get("log_every", 5)
+
+            if (epoch % every == 0) or (epoch == epochs - 1):
+                from src.interpretability.visualizer import log_interpretability_images
+
+                print("Logging interpretability visualizations...")
+                samples = cfg["interpretability"]["samples"]
+                log_interpretability_images(model, samples, device)
 
         # =====================================================
-        # VISUALIZATIONS
+        # VISUALIZATIONS (Confusion, PR curves, etc.)
         # =====================================================
-        VIS_EVERY = 5   # log every 5 epochs (or set 10)
-
+        VIS_EVERY = 5
         if (epoch % VIS_EVERY == 0) or (epoch == epochs - 1):
             try:
                 log_confusion_heatmap(all_targets, all_preds, CLASS_NAMES)
