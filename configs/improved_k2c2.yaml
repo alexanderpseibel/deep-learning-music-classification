@@ -1,0 +1,24 @@
+#configs/improved_k2c2.yaml
+experiment_name: "improved k2c2"
+model:
+  type: "GenericCNN"
+  channels: [32, 64, 128, 256, 512]
+  kernels:  [[3,3],[3,3],[3,3],[3,3],[3,3]]
+  pooling:  [[2,4],[2,4],[2,4],[3,5],[4,4]]
+  dropout: 0.2
+  activation: "elu"
+
+epochs: 20
+lr: 0.0001
+max_lr: 0.0005
+final_lr: 0.00001
+pct_start: 0.3
+weight_decay: 0.0001
+batch_size: 32
+num_workers: 16
+optimizer: "adamw"
+scheduler: "onecycle"
+use_normalization: false
+
+
+

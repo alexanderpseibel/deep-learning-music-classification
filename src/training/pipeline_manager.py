@@ -13,6 +13,7 @@ import random
 from src.data.fma_dataset import FMAAudioDataset
 from src.training.wandb_utils import init_wandb
 from src.training.trainer import train_model
+from src.models.model_factory import build_model
 
 
 # ------------------------------------------------------------
@@ -55,7 +56,7 @@ def create_run_folder(base_dir):
 # ------------------------------------------------------------
 # MAIN PIPELINE
 # ------------------------------------------------------------
-def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini-project"):
+def run_training_pipeline(model_config_path, project_name="NLP-mini-project"):
 
     # Load config files
     cfg_paths = yaml.safe_load(open("configs/dataset_paths.yaml"))
@@ -163,7 +164,8 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     # Model
     # --------------------------------------------------------
     num_classes = len(label_cols)
-    model = model_class(num_classes=num_classes)
+    model = build_model(cfg, num_classes)
+    print("Model:", cfg["model"]["type"])
 
     # Device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

@@ -55,9 +55,12 @@ def init_wandb(config: dict, project_name: str = "nlp-mini-project"):
     os.environ["WANDB__SERVER_INTERNAL"] = "true"
     os.environ["WANDB_SYNC_TIMEOUT"] = "300"
 
+    run_name = config.get("experiment_name", None)
+
     wandb.init(
         project=project_name,
-        config=config
+        config=config,
+        name=run_name 
     )
 
     return wandb.config
