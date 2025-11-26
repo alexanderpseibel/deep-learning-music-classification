@@ -1,0 +1,38 @@
+experiment_name: "k2c2-k5-all"
+
+model:
+  type: "GenericCNN"
+  channels: [32, 64, 128, 256, 512]
+  kernels:  [[5,5], [5,5], [5,5], [5,5], [5,5]]
+  pooling:  [[2,4], [2,4], [2,4], [3,5], [4,4]]
+  dropout: 0.2
+  activation: "elu"
+
+epochs: 20
+lr: 0.0001
+max_lr: 0.0005
+final_lr: 0.00001
+pct_start: 0.3
+
+weight_decay: 0.0001
+
+batch_size: 32
+num_workers: 16
+
+optimizer: "adamw"
+scheduler: "onecycle"
+use_normalization: false
+
+interpretability:
+  enabled: true
+  log_every: 5
+  samples:
+    - track_id: 9793
+      label: 11
+      path: "/work/NLP-mini-project/datasets/fma/fma_clean/mels/009/009793.npy"
+    - track_id: 110757
+      label: 5
+      path: "/work/NLP-mini-project/datasets/fma/fma_clean/mels/110/110757.npy"
+    - track_id: 123844
+      label: 0
+      path: "/work/NLP-mini-project/datasets/fma/fma_clean/mels/123/123844.npy"
