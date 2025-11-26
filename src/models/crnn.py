@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class CRNNFMA(nn.Module):
+class CRNN(nn.Module):
     """
     CRNN model inspired by:
     'Convolutional Recurrent Neural Networks for Music Classification'
