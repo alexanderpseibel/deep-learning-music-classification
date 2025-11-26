@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class ImprovedK2C2CNN(nn.Module):
+class K2C2CNN(nn.Module):
     """
     A Pytorch implementation of the k2c2 CNN architecture
     from Choi et al., 2017 (Music Tagging) ─ best pure CNN.

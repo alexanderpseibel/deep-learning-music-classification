@@ -15,6 +15,3 @@ scheduler: "onecycle"
 max_lr: 0.0005
 final_lr: 0.00001
 pct_start: 0.3
-
-# No dropout in paper K2C2
-use_specaugment: false

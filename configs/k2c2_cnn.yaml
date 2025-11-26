@@ -2,7 +2,7 @@
 #      MODEL + TRAINING
 # ------------------------------
 
-model: "ImprovedK2C2CNN"
+model: "K2C2CNN"
 seed: 42
 
 # Use full dataset
@@ -42,16 +42,3 @@ final_lr: 0.00001
 
 # Start with a warmup of 30% of the cycle
 pct_start: 0.3
-
-# ------------------------------
-#      Data Augmentation
-# ------------------------------
-
-use_specaugment: false
-
-# You may keep these defaults for future experiments
-specaugment:
-  freq_masks: 2
-  time_masks: 2
-  freq_max_width: 20
-  time_max_width: 50

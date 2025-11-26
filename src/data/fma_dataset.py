@@ -11,9 +11,8 @@ class FMAAudioDataset(Dataset):
 
     TARGET_T = 3000  # fixed mel width
 
-    def __init__(self, df, transform=None, mean=None, std=None):
+    def __init__(self, df, mean=None, std=None):
         self.df = df.reset_index(drop=True)
-        self.transform = transform
         self.label_cols = [c for c in df.columns if c.startswith("label_")]
 
         # --- Normalization parameters ---
@@ -42,10 +41,6 @@ class FMAAudioDataset(Dataset):
         # ----- Load mel spectrogram -----
         mel = np.load(row["mel_path"])          # numpy array (128, T)
         mel = self._fix_length(mel)
-
-        # ----- Apply SpecAugment BEFORE converting to torch -----
-        if self.transform:
-            mel = self.transform(mel)           # still numpy
 
         # ----- Normalization (after SpecAugment, before tensor) -----
         if self.mean is not None and self.std is not None:

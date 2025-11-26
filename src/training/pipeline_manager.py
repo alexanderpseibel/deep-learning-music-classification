@@ -11,7 +11,6 @@ from iterstrat.ml_stratifiers import MultilabelStratifiedShuffleSplit
 import random
 
 from src.data.fma_dataset import FMAAudioDataset
-from src.data.transforms import SpecAugment
 from src.training.wandb_utils import init_wandb
 from src.training.trainer import train_model
 
@@ -118,21 +117,6 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
     print("VALID size:", len(valid_df))
 
     # --------------------------------------------------------
-    # SpecAugment
-    # --------------------------------------------------------
-    if cfg.get("use_specaugment", False):
-        print(">>> SpecAugment ENABLED")
-        sa = SpecAugment(
-            freq_masks=cfg["specaugment"].get("freq_masks", 2),
-            time_masks=cfg["specaugment"].get("time_masks", 2),
-            freq_max_width=cfg["specaugment"].get("freq_max_width", 20),
-            time_max_width=cfg["specaugment"].get("time_max_width", 50),
-        )
-    else:
-        print(">>> SpecAugment DISABLED")
-        sa = None
-
-    # --------------------------------------------------------
     # Normalization
     # --------------------------------------------------------
     if cfg.get("use_normalization", False):
@@ -145,14 +129,12 @@ def run_training_pipeline(model_class, model_config_path, project_name="NLP-mini
 
     train_ds = FMAAudioDataset(
         train_df,
-        transform=sa,
         mean=mean,
         std=std
     )
 
     valid_ds = FMAAudioDataset(
         valid_df,
-        transform=None,
         mean=mean,
         std=std
     )
