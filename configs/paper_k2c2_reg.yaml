@@ -1,12 +1,14 @@
-#configs/improved_k2c2.yaml
-experiment_name: "improved k2c2"
+# configs/paper_k2c2_reg.yaml
+experiment_name: "paper k2c2 reg"
+
 model:
   type: "GenericCNN"
-  channels: [32, 64, 128, 256, 512]
-  kernels:  [[3,3],[3,3],[3,3],[3,3],[3,3]]
-  pooling:  [[2,4],[2,4],[2,4],[3,5],[4,4]]
+  channels: [64, 128, 128, 256, 256]
+  kernels:  [[3,3], [3,3], [3,3], [3,3], [3,3]]
+  pooling:  [[2,4], [2,4], [2,4], [3,5], [4,4]]
   dropout: 0.2
   activation: "elu"
+
 
 epochs: 20
 lr: 0.0001
@@ -23,6 +25,5 @@ optimizer: "adamw"
 scheduler: "onecycle"
 use_normalization: false
 
-#Total ≈ 3.13 million params
-
+#Total ≈ 2.21 million params
 
