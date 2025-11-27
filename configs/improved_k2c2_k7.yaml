@@ -1,5 +1,5 @@
 #configs/improved_k2c2_k7.yaml
-experiment_name: "k2c2-k7" 
+experiment_name: "k2c2-k7-all" 
 
 model:
   type: "GenericCNN"
