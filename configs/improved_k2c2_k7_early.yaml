@@ -1,10 +1,10 @@
-#configs/improved_k2c2_K5.yaml
-experiment_name: "k2c2-k5-all"
+#configs/improved_k2c2_k5_early.yaml
+experiment_name: "k2c2-k7-early"
 
 model:
   type: "GenericCNN"
   channels: [32, 64, 128, 256, 512]
-  kernels:  [[5,5], [5,5], [5,5], [5,5], [5,5]]
+  kernels:  [[7,7], [3,3], [3,3], [3,3], [3,3]]
   pooling:  [[2,4], [2,4], [2,4], [3,5], [4,4]]
   dropout: 0.2
   activation: "elu"
