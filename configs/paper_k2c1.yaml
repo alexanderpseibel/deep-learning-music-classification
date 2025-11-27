@@ -1,0 +1,31 @@
+experiment_name: "k2c1"
+
+model:
+  type: "GenericCNN"
+  channels: [32, 64, 128, 256, 256]     # 5 blocks
+  kernels:
+    - [128, 4]     # full frequency kernel
+    - [1, 4]
+    - [1, 4]
+    - [1, 4]
+    - [1, 4]
+  pooling:
+    - [1, 4]
+    - [1, 4]
+    - [1, 5]
+    - [1, 5]
+    - [1, 5]
+  dropout: 0.2
+  activation: "elu"
+
+epochs: 20
+lr: 0.0001
+max_lr: 0.0005
+final_lr: 0.00001
+pct_start: 0.3
+weight_decay: 0.0001
+batch_size: 32
+num_workers: 16
+optimizer: "adamw"
+scheduler: "onecycle"
+use_normalization: false
