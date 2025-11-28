@@ -27,3 +27,22 @@ num_workers: 16
 optimizer: "adamw"
 scheduler: "onecycle"
 use_normalization: false
+
+# ------------------------------
+# Interpretability (Grad-CAM + SmoothGrad)
+# ------------------------------
+interpretability:
+  enabled: true
+  log_every: 5
+  samples:
+    - track_id: 9793
+      label: 11   # SoulRnB
+      path: "/work/NLP-mini-project/datasets/fma/fma_clean/mels/009/009793.npy"
+
+    - track_id: 110757
+      label: 5    # HipHop
+      path: "/work/NLP-mini-project/datasets/fma/fma_clean/mels/110/110757.npy"
+
+    - track_id: 123844
+      label: 0    # Rock
+      path: "/work/NLP-mini-project/datasets/fma/fma_clean/mels/123/123844.npy"
