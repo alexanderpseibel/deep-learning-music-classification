@@ -4,7 +4,7 @@ model:
   type: "GenericCNN"
   channels: [32, 64, 128, 256, 256]     # 5 blocks
   kernels:
-    - [128, 4]     # full frequency kernel
+    - [128, 1]     # full frequency kernel
     - [1, 4]
     - [1, 4]
     - [1, 4]
