@@ -10,7 +10,7 @@ import traceback
 # CONFIG — UPDATE THESE TWO PATHS
 # -------------------------------------------------------
 INPUT_ROOT = "/datasets/fma/fma_clean/fma_selected"
-OUTPUT_ROOT = "/work/NLP-mini-project/mels"      # must be writable!
+OUTPUT_ROOT = "/work/NLP-mini-project/mels"      
 
 SAMPLE_RATE = 32000
 N_MELS = 128
