@@ -395,7 +395,7 @@ k2c1 (full-frequency first layer):
 #### Performance Metrics
 
 ##### Train/Val Loss
-![alt text](images/<loss train loss val.png>)
+![alt text](images/<loss_train_loss_val.png>)
 
 - Both curves decrease steadily, meaning the model is learning meaningful structure rather than memorizing noise.
 - Validation loss stays close to training loss, indicating little to no overfitting 
@@ -408,7 +408,7 @@ k2c1 (full-frequency first layer):
 - A value around 0.54 means the model ranks the true genres above non-relevant genres fairly reliably (strong performance given the difficulty of multi-label music tagging and the imbalance across genres)
 
 ##### F1 (Micro/Macro)
-![alt text](images/<f1 macro.png>) ![alt text](images/<f1 micro.png>)
+![alt text](images/<f1_macro.png>) ![alt text](images/<f1_micro.png>)
 
 - F1 Macro: averages F1 per class --> treats all genres equally, regardless of how many samples they have
 - F1 Micro: aggregates all predictions globally --> dominated by the frequent genres.
@@ -417,7 +417,7 @@ k2c1 (full-frequency first layer):
 - Macro F1 rising throughout training indicates the model slowly learns to recognize minority genres as well, not just the dominant ones.
 
 ##### Ranking Loss / Recall@3
-![alt text](images/<ranking loss.png>) ![alt text](images/recall@3.png)
+![alt text](images/<ranking_loss.png>) ![alt text](images/recall@3.png)
 
 - Ranking Loss: fraction of times a true label gets ranked below a false label (Lower is better. Perfect ranking = 0)
 - Recall@3: how often at least one of the top-3 predicted genres is correct (Higher is better)
