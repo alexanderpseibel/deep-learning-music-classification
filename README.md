@@ -170,7 +170,7 @@ Although differences in the raw curves were subtle, PCA reveals stable structure
 
 ## 3. Central Method: Architecture & Training Framework
 
-Our work builds on the convolutional architectures introduced in Choi et al. (2017) for music tagging on the Million Song Dataset with Last.fm tags.
+Our work builds on the convolutional architectures introduced in Choi et al. (2017) [1] for music tagging on the Million Song Dataset with Last.fm tags.
 In their study, the authors trained several CNN and CRNN variants on log-Mel spectrograms to predict the top-50 most frequent multi-label tags (including genres, moods, instruments, and eras).
 
 Among the paper’s models (k1c2, k2c1, k2c2, and CRNN) the k2c2 CNN (stacked 3×3 convolutions with asymmetric pooling) was the strongest pure-convolutional baseline and serves as the foundation of our study.
@@ -178,11 +178,14 @@ While the original paper evaluates models exclusively using AUC-ROC, we broaden 
 
 ![alt text](images/architectures.png)
 
+*Figure adapted from Choi et al. (2017) [1]. Convolutional Recurrent Neural Networks for Music Classification.*
+
+
 <details>
   <summary><span style="background-color: #ff0000ff;">Architectures, Training Mechanisms & Regularization</span></summary>
 
 
-### Architectures Used in Our Study
+### Architectures Used
 
 All models in our work are 2D CNNs applied directly to 128×3000 Mel-spectrograms.
 Depending on the variant, they differ in:
@@ -562,3 +565,14 @@ Using 5–10 second excerpts instead of full 30-second clips would reduce storag
 
 #### 3. Using architectures with longer temporal modeling.
 CRNNs, temporal attention, or transformer-based models could capture longer-range structure that pure CNNs struggle with.
+
+
+<details>
+  <summary>References</summary>
+  
+  [1] K. Choi, G. Fazekas, M. Sandler, and K. Cho.  
+  **Convolutional Recurrent Neural Networks for Music Classification.**  
+  arXiv:1609.04243, 2016.  
+  https://doi.org/10.48550/arXiv.1609.04243
+
+</details>
