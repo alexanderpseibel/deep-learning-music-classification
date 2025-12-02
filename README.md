@@ -483,11 +483,11 @@ Interpretation:
 
 ![alt text](images/mels_hiphop.png) ![alt text](images/mels_rock.png) ![alt text](images/mels_soulrnb.png)
 
-![alt text](images/interpretability_hiphop1.png) ![alt text](images/interpretability_rock1.png) ![alt text](images/interpretability_soulrnb1.png)
+![alt text](images/interpretability_hiphop1.png)  ![alt text](images/interpretability_rock1.png)  ![alt text](images/interpretability_soulrnb1.png)
 
-![alt text](images/interpretability_hiphop2.png) ![alt text](images/interpretability_rock2.png) ![alt text](images/interpretability_soulrnb2.png)
+![alt text](images/interpretability_hiphop2.png)  ![alt text](images/interpretability_rock2.png)  ![alt text](images/interpretability_soulrnb2.png)
 
-![alt text](images/interpretability_hiphop3.png) ![alt text](images/interpretability_rock3.png) ![alt text](images/interpretability_soulrnb3.png)
+![alt text](images/interpretability_hiphop3.png)  ![alt text](images/interpretability_rock3.png)  ![alt text](images/interpretability_soulrnb3.png)
 
 
 
