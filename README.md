@@ -70,7 +70,7 @@ Before training the main models, we explored different ways of representing the 
 - **Mel + CQT (combined):** two-channel input stacking both spectrogram types
 
 Although this comparison was only exploratory, the Mel spectrogram showed the best 
-performance in that small setup. 
+performance in that small setup. For more information, read: https://github.itu.dk/alps/nlp-mini-project/blob/main/notebooks/readme_audiopreprocessing_and_representation_comparison.txt
 
 We therefore convert each 30-second audio track into a log-Mel spectrogram. 
 This representation maps the audio into a 2D time–frequency space that is well suited 
