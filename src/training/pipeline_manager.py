@@ -1,14 +1,13 @@
 # src/training/pipeline_manager.py
-
 import os
+import random
 import yaml
-import pandas as pd
 import numpy as np
+import pandas as pd
 import torch
 import wandb
 from torch.utils.data import DataLoader
 from iterstrat.ml_stratifiers import MultilabelStratifiedShuffleSplit
-import random
 
 from src.data.fma_dataset import FMAAudioDataset
 from src.training.wandb_utils import init_wandb
@@ -16,176 +15,97 @@ from src.training.trainer import train_model
 from src.models.model_factory import build_model
 
 
-# ------------------------------------------------------------
-# Seed
-# ------------------------------------------------------------
 def set_seed(seed=42):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
 
-# ------------------------------------------------------------
-# Create run/XXX folder
-# ------------------------------------------------------------
 def create_run_folder(base_dir):
     os.makedirs(base_dir, exist_ok=True)
-
-    existing = [
-        d for d in os.listdir(base_dir)
-        if d.startswith("run_") and os.path.isdir(os.path.join(base_dir, d))
-    ]
-
+    existing = [d for d in os.listdir(base_dir) if d.startswith("run_") and os.path.isdir(os.path.join(base_dir, d))]
     nums = []
     for name in existing:
         try:
             nums.append(int(name.split("_")[1]))
-        except:
+        except ValueError:
             pass
-
-    next_num = max(nums) + 1 if nums else 1
-    path = os.path.join(base_dir, f"run_{next_num:03d}")
+    path = os.path.join(base_dir, f"run_{max(nums) + 1 if nums else 1:03d}")
     os.makedirs(path)
     return path
 
 
-# ------------------------------------------------------------
-# MAIN PIPELINE
-# ------------------------------------------------------------
 def run_training_pipeline(model_config_path, project_name="NLP-mini-project"):
-
-    # Load config files
     cfg_paths = yaml.safe_load(open("configs/dataset_paths.yaml"))
     cfg_model = yaml.safe_load(open(model_config_path))
     cfg = {**cfg_paths, **cfg_model}
 
-    # Seed
     seed = cfg.get("seed", 42)
     set_seed(seed)
-    print(f"Seed set to {seed}")
+    print(f"Seed: {seed}")
 
-    # Load metadata
     df = pd.read_csv(cfg["metadata_csv"])
-    print("Loaded metadata rows:", len(df))
+    print(f"Loaded metadata: {len(df)} rows")
 
-    # --------------------------------------------------------
-    # Subset selection
-    # --------------------------------------------------------
+    label_cols = [c for c in df.columns if c.startswith("label_")]
+
     if cfg.get("subset_size") is not None:
         subset_size = cfg["subset_size"]
-        total = len(df)
-
-        if subset_size < total:
-            print(f"Selecting balanced subset of size {subset_size}…")
-
-            label_cols = [c for c in df.columns if c.startswith("label_")]
+        if subset_size < len(df):
+            print(f"Selecting stratified subset of {subset_size}...")
             y_full = df[label_cols].values
-
             splitter = MultilabelStratifiedShuffleSplit(
                 n_splits=1,
-                train_size=subset_size / total,
-                test_size=1 - subset_size / total,
-                random_state=seed
+                train_size=subset_size / len(df),
+                test_size=1 - subset_size / len(df),
+                random_state=seed,
             )
-
             subset_idx, _ = next(splitter.split(df, y_full))
             df = df.iloc[subset_idx].reset_index(drop=True)
-            print(f"Subset selected: {len(df)}")
+            print(f"Subset size: {len(df)}")
         else:
-            print("Subset size >= dataset, skipping subset selection.")
+            print("Subset size >= dataset, using full dataset.")
 
-    # --------------------------------------------------------
-    # Train/Valid split
-    # --------------------------------------------------------
-    label_cols = [c for c in df.columns if c.startswith("label_")]
     y = df[label_cols].values
-
-    splitter = MultilabelStratifiedShuffleSplit(
-        n_splits=1,
-        test_size=0.1,
-        random_state=seed
-    )
-
+    splitter = MultilabelStratifiedShuffleSplit(n_splits=1, test_size=0.1, random_state=seed)
     train_idx, valid_idx = next(splitter.split(df, y))
     train_df = df.iloc[train_idx].reset_index(drop=True)
     valid_df = df.iloc[valid_idx].reset_index(drop=True)
+    print(f"Train: {len(train_df)} | Val: {len(valid_df)}")
 
-    print("TRAIN size:", len(train_df))
-    print("VALID size:", len(valid_df))
-
-    # --------------------------------------------------------
-    # Normalization
-    # --------------------------------------------------------
     if cfg.get("use_normalization", False):
-        mean = cfg["mel_mean"]
-        std = cfg["mel_std"]
-        print(f">>> Normalization ENABLED (mean={mean}, std={std})")
+        mean, std = cfg["mel_mean"], cfg["mel_std"]
+        print(f">>> Normalization on (mean={mean}, std={std})")
     else:
         mean, std = None, None
-        print(">>> Normalization DISABLED")
+        print(">>> Normalization off")
 
-    train_ds = FMAAudioDataset(
-        train_df,
-        mean=mean,
-        std=std
-    )
+    train_ds = FMAAudioDataset(train_df, mean=mean, std=std)
+    valid_ds = FMAAudioDataset(valid_df, mean=mean, std=std)
 
-    valid_ds = FMAAudioDataset(
-        valid_df,
-        mean=mean,
-        std=std
-    )
+    train_loader = DataLoader(train_ds, batch_size=cfg["batch_size"], shuffle=True,
+                              num_workers=cfg["num_workers"], pin_memory=True)
+    valid_loader = DataLoader(valid_ds, batch_size=cfg["batch_size"], shuffle=False,
+                              num_workers=cfg["num_workers"], pin_memory=True)
 
-    # --------------------------------------------------------
-    # Dataloaders
-    # --------------------------------------------------------
-    train_loader = DataLoader(
-        train_ds,
-        batch_size=cfg["batch_size"],
-        shuffle=True,
-        num_workers=cfg["num_workers"],
-        pin_memory=True
-    )
-
-    valid_loader = DataLoader(
-        valid_ds,
-        batch_size=cfg["batch_size"],
-        shuffle=False,
-        num_workers=cfg["num_workers"],
-        pin_memory=True
-    )
-
-
-    # --------------------------------------------------------
-    # Model
-    # --------------------------------------------------------
     num_classes = len(label_cols)
     model = build_model(cfg, num_classes)
-    print("Model:", cfg["model"]["type"])
+    print(f"Model: {cfg['model']['type']}")
 
-    # Device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print("Training on:", device)
+    print(f"Device: {device}")
 
-    # --------------------------------------------------------
-    # W&B
-    # --------------------------------------------------------
     init_wandb(config=cfg, project_name=project_name)
     wandb.define_metric("epoch")
     wandb.define_metric("loss/*", step_metric="epoch")
 
-    # Run folder
     run_folder = create_run_folder(cfg["misclassified_examples"])
-    print("Saving logs to:", run_folder)
+    print(f"Run folder: {run_folder}")
     yaml.safe_dump(cfg, open(os.path.join(run_folder, "config_used.yaml"), "w"))
 
-    # --------------------------------------------------------
-    # Training
-    # --------------------------------------------------------
     train_model(
         model=model,
         train_loader=train_loader,
@@ -195,7 +115,7 @@ def run_training_pipeline(model_config_path, project_name="NLP-mini-project"):
         lr=cfg["lr"],
         weight_decay=cfg.get("weight_decay", 0.0),
         run_folder=run_folder,
-        cfg=cfg        # <-- IMPORTANT! Pass full config
+        cfg=cfg,
     )
 
     print("Training complete.")
