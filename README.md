@@ -1,6 +1,14 @@
 # Music Tagging with CNN Architectures
 Deep Learning for Multi-Label Music Classification
 
+## TL;DR
+
+* **The Problem:** Building a robust multi-label music genre classification model on a highly imbalanced dataset (FMA) using 30-second audio clips, where many tracks belong to multiple overlapping genres.
+* **The Solution:** We processed ~90,000 audio tracks into log-Mel spectrograms and systematically evaluated various CNN architectures based on Choi et al. (2017). We introduced a modern training regime (AdamW, One-Cycle LR, Dropout) and experimented with kernel scaling to optimize time-frequency feature extraction.
+* **Key Findings:** * Enlarging convolution kernels to 5×5 across all layers (`k2c2-k5-all`) provided the best balance of local detail and global context, achieving a mean Average Precision (mAP) of 0.5461 and an 84.37% Recall@3.
+  * Modern regularization and training techniques proved more impactful than structural architectural changes.
+  * Grad-CAM analysis confirmed that the CNN successfully converged on distinct, genre-specific spectral signatures (e.g., sharp focus for Rock vs. wide-band for HipHop) rather than memorizing noise.
+
 ## 1. Central Problem, Domain & Data
 
 Central Problem
